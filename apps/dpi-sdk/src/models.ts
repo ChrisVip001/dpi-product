@@ -16,6 +16,7 @@ import type {
   WireEntry,
   WireMessageChange,
   WireSnapshotEvent,
+  WireViewUpdate,
   WireUsageState,
 } from "./api.js";
 import { toTranscript, type LiveTool, type TranscriptItem } from "./transcript.js";
@@ -116,6 +117,9 @@ export class AgentModel extends Emitter {
         this.reset(frame.snapshot);
         this.state.inbox = frame.inbox;
         break;
+      case "view":
+        this.view(frame.view);
+        break;
       case "batch":
         for (const event of frame.events) this.event(event);
         break;
@@ -151,6 +155,37 @@ export class AgentModel extends Emitter {
     this.state.entries = entries;
     this.state.generating = !!this.live;
     this.state.items = toTranscript(entries, this.live, this.tools);
+  }
+
+  /**
+   * Apply a delta produced by a 1.5+ device: entries append, live fields replace, `reset` replaces the
+   * whole entry window. `null` clears a temporal field.
+   */
+  private view(update: WireViewUpdate) {
+    if (update.reset) {
+      this.entries.clear();
+      this.tools.clear();
+      this.live = undefined;
+    }
+    if (update.entries) for (const entry of update.entries) this.commit(entry);
+    if (update.generation !== undefined) {
+      this.live =
+        update.generation === null
+          ? undefined
+          : update.generation.message
+            ? structuredClone(update.generation.message)
+            : this.live;
+      this.state.retry = update.generation?.retry;
+    }
+    if (update.tools)
+      this.tools = new Map(
+        update.tools.map((slot) => [slot.callId, { name: slot.name, status: slot.status, output: slot.output ?? "" }]),
+      );
+    if (update.run !== undefined) this.state.running = update.run !== null;
+    if (update.compactions) this.state.compactions = update.compactions.map((c) => c.taskId);
+    if (update.agent) this.state.agent = update.agent;
+    if (update.usage) this.state.usage = update.usage;
+    this.state.ready = true;
   }
 
   private reset(snapshot: WireSnapshotEvent) {

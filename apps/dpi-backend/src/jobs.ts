@@ -38,7 +38,12 @@ export const JobRuns = defineDoc<JobRunsDoc>({
   history: "latest",
   fork: "initial",
   initial: () => ({ counts: {}, items: {} }),
+  checkpointWhen: () => false,
 });
+
+/** Pace work inside a phase; 1.4+ removed runtime.sleep(), which used to hold the invocation. */
+const wait = (runtime: Pick<TaskRuntime<never, never, never, object>, "setTimer">, ms: number) =>
+  new Promise<void>((resolve) => runtime.setTimer(resolve, Math.max(0, ms)));
 
 type Values = Record<string, JobInputValue>;
 type Data = Record<string, JsonValue>;
@@ -390,7 +395,7 @@ export function createJobs(deps: JobsDeps) {
             );
             return;
           }
-          await runtime.sleep(runtime.now() + 500, ctx);
+          await wait(runtime, 500);
         }
       },
     },
@@ -475,7 +480,7 @@ export function createJobs(deps: JobsDeps) {
           return undefined;
         }
       },
-      sleepUntil: (at) => runtime.sleep(at, ctx),
+      sleepUntil: (at) => wait(runtime, at - runtime.now()),
       agent: async (prompt) => {
         let childId = 0;
         const stepId = `${spec.id}:${cp.iteration}:agent`;
@@ -560,7 +565,7 @@ export function createJobs(deps: JobsDeps) {
           runtime.signal.throwIfAborted();
           done = await Promise.race([
             settled,
-            runtime.sleep(runtime.now() + 600, ctx).then(
+            wait(runtime, 600).then(
               () => undefined,
               () => undefined,
             ),
@@ -667,7 +672,7 @@ export function createJobs(deps: JobsDeps) {
   async function runPhase(def: JobDef, index: number, task: Running, runtime: Run, ctx: Context) {
     const spec = def.phases[index];
     const cp = task.state.checkpoint;
-    if (index > 0 && cp.iteration === 0 && cp.approvalTask === undefined) await runtime.sleep(runtime.now() + PACE_MS, ctx);
+    if (index > 0 && cp.iteration === 0 && cp.approvalTask === undefined) await wait(runtime, PACE_MS);
     if (spec.kind === "approval") return approvalPhase(def, index, task, runtime, ctx);
 
     // Enter the phase. Steps recorded by this same iteration mean a crash interrupted it: replace them.

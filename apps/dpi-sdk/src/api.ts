@@ -417,6 +417,23 @@ export interface WireSnapshotEvent {
   usage: WireUsageState;
 }
 
+/**
+ * Incremental agent state. Every field is optional and replaces what the client holds; `null` clears a
+ * temporal field (a run that ended, a generation that finished). `reset` means the entry window was
+ * replaced, so the client drops its entries before applying `entries`.
+ */
+export interface WireViewUpdate {
+  reset?: boolean;
+  entries?: readonly WireEntry[];
+  run?: { inputs: readonly number[] } | null;
+  generation?: WireSnapshotEvent["generation"] | null;
+  tools?: readonly WireToolSlot[];
+  compactions?: readonly WireCompaction[];
+  inbox?: readonly WireQueued[];
+  agent?: WireAgentState;
+  usage?: WireUsageState;
+}
+
 export type WireAgentEvent =
   | WireSnapshotEvent
   | { type: "run_start" | "run_end"; inputs: readonly number[] }
@@ -502,6 +519,7 @@ export type Frame =
   | { type: "usage"; usage: UsageTotals }
   // agent scope
   | { type: "snapshot"; snapshot: WireSnapshotEvent; inbox: InboxItem[] }
+  | { type: "view"; view: WireViewUpdate }
   | { type: "batch"; events: readonly WireAgentEvent[] }
   | { type: "inbox"; items: InboxItem[] }
   // any scope that asked for documents

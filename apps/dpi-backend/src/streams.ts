@@ -2,9 +2,10 @@
 // device (tree + activity), session (agents, tasks, usage) and agent (pi-durable agent events).
 // Streams are viewers only: closing one never aborts work or closes a harness.
 import type { Request, Response } from "express";
-import { watchEvents, type Conversation, type Harness } from "@earendil-works/pi-durable";
+import type { Conversation, Harness } from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import type { Activity, DeviceTree, Frame, StreamScope } from "../../dpi-sdk/src/api.js";
+import { ViewDiffer } from "./view-wire.js";
 import { AGENT_DOC_KINDS, DEVICE_DOC_KINDS, type SessionRow, type Store } from "./store.js";
 import { invalid } from "./errors.js";
 
@@ -151,7 +152,12 @@ export function deviceStream(store: Store, req: Request, res: Response) {
     }
   }, 250);
   sse.onClose(store.subscribe(push));
-  sse.onClose(() => push.cancel());
+  // 1.5 dropped commit subscriptions: poll the tree so busy -> idle still produces activity.
+  const tick = setInterval(() => push(), 1000);
+  sse.onClose(() => {
+    clearInterval(tick);
+    push.cancel();
+  });
   void push.now();
 }
 
@@ -165,9 +171,9 @@ export async function sessionStream(store: Store, row: SessionRow, res: Response
     Object.values(value.tasks).map((t) => store.taskNode(t));
   let tasks = await store.labelTasks(h, tasksOf(watch.value));
   sse.send({ type: "session", agents: await store.agents(row, tasks), tasks, usage: await store.usage(h) });
-  watch.start(async (value) => {
-    if (sse.closed) return;
-    tasks = await store.labelTasks(h, tasksOf(value));
+  watch.start(async (call) => {
+    if (sse.closed || call.kind !== "value") return;
+    tasks = await store.labelTasks(h, tasksOf(call.value));
     sse.sendIfChanged("tasks", { type: "tasks", tasks });
     push();
   });
@@ -176,11 +182,13 @@ export async function sessionStream(store: Store, row: SessionRow, res: Response
     sse.sendIfChanged("agents", { type: "agents", agents: await store.agents(row, tasks) });
     sse.sendIfChanged("usage", { type: "usage", usage: await store.usage(h) });
   }, 250);
-  const off = h.subscribeCommits(() => push());
+  // 1.5 dropped commit subscriptions: the graph watch covers task changes, and a cheap tick keeps
+  // agents/usage fresh (sendIfChanged drops unchanged frames).
+  const tick = setInterval(() => push(), 1000);
   // Agent names live in the device catalog, not the harness: a rename only fires the store's change feed.
   const offCatalog = store.subscribe(() => push());
   sse.onClose(() => {
-    off();
+    clearInterval(tick);
     offCatalog();
     push.cancel();
     void watch.stop();
@@ -197,28 +205,45 @@ export async function agentStream(
 ) {
   const { row, h, c } = target;
   const docs = parseDocs(req.query.docs, AGENT_DOC_KINDS);
-  const stream = await watchEvents(h, c.id, ctx);
+  // 1.5: the conversation view replaces the old event stream. The window keeps the newest 50 entries and
+  // grows to 200 before it splices down; a splice makes the next frame a fresh snapshot.
+  const watch = await c.watch(ctx, { min: 50, max: 200 });
   const sse = openSse(res, { kind: "agent", sessionId: row.id, agentId: c.id as number });
+  const differ = new ViewDiffer();
+  const first = differ.next(watch.value);
   sse.send({
     type: "snapshot",
-    snapshot: JSON.parse(JSON.stringify(stream.snapshot)),
+    snapshot: first && "full" in first ? first.full : (undefined as never),
     inbox: await store.inbox(h, c),
   });
+  const push = coalesce(async () => {
+    if (sse.closed) return;
+    const next = differ.next(watch.value);
+    if (!next) return;
+    if ("full" in next) sse.send({ type: "snapshot", snapshot: next.full, inbox: await store.inbox(h, c) });
+    else sse.send({ type: "view", view: next.update });
+  }, 100);
+  const pushInbox = coalesce(async () => {
+    if (!sse.closed) sse.send({ type: "inbox", items: await store.inbox(h, c) });
+  }, 250);
   const pushDocs = coalesce(async () => {
     for (const kind of docs)
       sse.sendIfChanged(`doc:${kind}`, { type: "doc", kind, value: await store.agentDoc(h, c, kind) });
-  }, 150);
+  }, 500);
   await pushDocs.now();
-  stream.start(async (events) => {
-    if (sse.closed) return;
-    sse.send({ type: "batch", events: JSON.parse(JSON.stringify(events)) });
-    if (events.some((e) => e.type === "inbox_update" || e.type === "snapshot"))
-      sse.send({ type: "inbox", items: await store.inbox(h, c) });
+  watch.start(async (call) => {
+    if (call.kind !== "value") return;
+    push();
+    pushInbox();
+    if (docs.length) pushDocs();
   });
-  const offDocs = docs.length ? h.subscribeCommits(() => pushDocs()) : () => {};
+  // Custom documents are not part of the view: poll them, cheaply and only while a viewer asked.
+  const tick = docs.length ? setInterval(() => pushDocs(), 1000) : undefined;
   sse.onClose(() => {
-    offDocs();
+    if (tick) clearInterval(tick);
+    push.cancel();
+    pushInbox.cancel();
     pushDocs.cancel();
-    void stream.stop();
+    void watch.stop();
   });
 }

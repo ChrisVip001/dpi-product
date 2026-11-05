@@ -1,5 +1,5 @@
 import type { SharedState } from "./shared-state.js";
-import { Type } from "@earendil-works/pi-ai";
+import { bool, int, map, num, obj, oneOf, opt, str, union } from "@earendil-works/pi-schema";
 import { isAbsolute, resolve } from "node:path";
 import { readState, type AppState } from "../../dpi-sdk/src/app-state.js";
 import type { SessionSummary, ThinkingLevel } from "../../dpi-sdk/src/api.js";
@@ -27,12 +27,14 @@ export const Workspace = defineDoc<AppState>({
   history: "rewindable",
   fork: "asOf",
   initial: () => ({ goal: "Explore durable agents", counter: 0, notes: [] }),
+  checkpointWhen: () => false,
 });
 const Receipt = defineDoc<{ applied: boolean; result: string }>({
   kind: "demo.receipt",
   version: 1,
   scope: "task",
   initial: () => ({ applied: false, result: "" }),
+  checkpointWhen: () => false,
 });
 /** ping_on_call_engineer pages once per agent; this records the page. */
 const Pager = defineDoc<{ paged: boolean; at: number; page: string; summary: string }>({
@@ -42,6 +44,7 @@ const Pager = defineDoc<{ paged: boolean; at: number; page: string; summary: str
   history: "latest",
   fork: "initial",
   initial: () => ({ paged: false, at: 0, page: "", summary: "" }),
+  checkpointWhen: () => false,
 });
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -105,12 +108,12 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "read_state",
     description:
       "Read the shared App State object used by every session, conversation and fork, or a field at a JSON Pointer path. Empty path reads the whole object.",
-    parameters: Type.Object({ path: Type.Optional(Type.String()) }),
+    parameters: obj({ path: opt(str()) }),
     replay: "safe",
     execute: async (args) => {
       const { value } = await shared.snapshot();
       return {
-        content: [{ type: "text", text: JSON.stringify(readState(value, args.path ?? "")) }],
+        output: [{ type: "text", text: JSON.stringify(readState(value, args.path ?? "")) }],
       };
     },
   });
@@ -118,16 +121,11 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "update_state",
     description:
       'CRUD the same shared App State for every agent and fork in this demo. create adds a new field, update replaces an existing value, delete removes it, increment adds a signed number. value_json must be JSON-encoded text: 3 for a number, true for a boolean, "hello" (including quotes) for a string, {"enabled":true} for an object, or [1,2] for an array. Omit value_json for delete. Use JSON Pointer paths: /counter, /settings/enabled, /notes/- to append. Escape ~ as ~0 and / as ~1. Empty path with update replaces the whole root object, with delete clears it. Read first with read_state. UI controls update live. Changes are atomic and replay-safe.',
-    parameters: Type.Object({
-      operation: Type.Union([
-        Type.Literal("create"),
-        Type.Literal("update"),
-        Type.Literal("delete"),
-        Type.Literal("increment"),
-      ]),
-      path: Type.String(),
-      value_json: Type.Optional(
-        Type.String({
+    parameters: obj({
+      operation: oneOf(["create", "update", "delete", "increment"]),
+      path: str(),
+      value_json: opt(
+        str({
           description:
             "JSON-encoded value. Objects and arrays must be encoded as JSON here, not passed as native tool argument objects.",
         }),
@@ -155,7 +153,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
         }
         return receipt.result;
       }, ctx);
-      return { content: [{ type: "text", text: value }] };
+      return { output: [{ type: "text", text: value }] };
     },
   });
   const recentRuns = async (api: Pick<ToolExecutionApi, "conversationId" | "snapshot">, ctx: Context) =>
@@ -164,12 +162,12 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "list_durable_jobs",
     description:
       "List the durable jobs you can start with run_durable_job: each job's id, what it does, its named phases, the inputs it takes (type, default, limits), whether it waits for a person's approval, the App State path where every run saves its result, and its recent runs in this conversation with their task ids for check_durable_job.",
-    parameters: Type.Object({}),
+    parameters: obj({}),
     replay: "safe",
     execute: async (_args, api, ctx) => {
       const runs = await recentRuns(api, ctx);
       return {
-        content: [
+        output: [
           {
             type: "text",
             text: JSON.stringify(
@@ -202,15 +200,15 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "run_durable_job",
     description:
       'Start a durable job: a repeatable workflow with named phases that runs as one checkpointed task and shows live in the chat. Call list_durable_jobs first for ids and inputs. It runs in the background: you get its task id at once, the conversation owns the run, and you check it with check_durable_job. Set wait true only when the user wants you to wait for the result; then the call owns the run, an interrupt stops it, and you get the outcome of every phase. Example: {"job":"workspace-snapshot","input":{"path":"."}}.',
-    parameters: Type.Object({
-      job: Type.String({ description: "Job id from list_durable_jobs." }),
-      input: Type.Optional(
-        Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]), {
+    parameters: obj({
+      job: str({ description: "Job id from list_durable_jobs." }),
+      input: opt(
+        map(union([str(), num()]), {
           description: "The job's inputs by name. Omitted inputs use their defaults.",
         }),
       ),
-      wait: Type.Optional(
-        Type.Boolean({ description: "Wait for the run to finish, including any approval. Default false." }),
+      wait: opt(
+        bool({ description: "Wait for the run to finish, including any approval. Default false." }),
       ),
     }),
     replay: "safe",
@@ -240,7 +238,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       if (!wait) {
         const run = await read();
         return {
-          content: [
+          output: [
             {
               type: "text",
               text: `Started ${def.title} run #${run?.run ?? "?"} as durable task #${taskId}. It runs in the background, shows live in the chat and saves its result to App State ${def.resultPath}. Check it with check_durable_job {"task_id":${taskId}}.`,
@@ -263,7 +261,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       }
       const ok = run?.status === "completed";
       return {
-        content: [
+        output: [
           {
             type: "text",
             text: run
@@ -280,9 +278,9 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "check_durable_job",
     description:
       "Check durable job runs in this conversation. With task_id, one run in full: status, current phase, every phase's outcome and steps (commands, the subagent's tool calls, App State writes), approval, result or error. With job, that job's latest run. With neither, a short list of recent runs. Task ids come from run_durable_job and list_durable_jobs.",
-    parameters: Type.Object({
-      task_id: Type.Optional(Type.Integer({ minimum: 1, description: "The run's task id." })),
-      job: Type.Optional(Type.String({ description: "A job id: check its latest run." })),
+    parameters: obj({
+      task_id: opt(int({ minimum: 1, description: "The run's task id." })),
+      job: opt(str({ description: "A job id: check its latest run." })),
     }),
     replay: "safe",
     execute: async (args, api, ctx) => {
@@ -295,7 +293,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
             : undefined;
       if (args.task_id === undefined && args.job === undefined)
         return {
-          content: [
+          output: [
             {
               type: "text",
               text: JSON.stringify(
@@ -308,31 +306,25 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
         throw Error(
           `No run ${args.task_id !== undefined ? `with task id ${args.task_id}` : `of ${args.job}`} in this conversation. Runs: ${runs.map((r) => `${r.id} (${r.job} #${r.run})`).join(", ") || "none"}`,
         );
-      return { content: [{ type: "text", text: JSON.stringify(runReport(run, Date.now())) }] };
+      return { output: [{ type: "text", text: JSON.stringify(runReport(run, Date.now())) }] };
     },
   });
   const searchHistoryTool = defineTool({
     name: "search_history",
     description:
       "Search your own full stored history, including entries from before a reset, handoff or compaction that you can no longer see. Filter by words (query), by tool name (tool), by entry kind, or by entry number range (from_entry, to_entry). Pass entry to read one entry in full by its number. Results come newest first (order oldest to reverse) and are paged with limit and offset; use next_offset for the next page. Each result says whether the entry is active, compacted or before reset.",
-    parameters: Type.Object({
-      query: Type.Optional(Type.String({ description: "Words that must all appear, case-insensitive." })),
-      tool: Type.Optional(Type.String({ description: "Only calls to and results from this tool, for example bash." })),
-      entry: Type.Optional(Type.Integer({ minimum: 1, description: "Read this one entry in full." })),
-      kind: Type.Optional(
-        Type.Union([
-          Type.Literal("user"),
-          Type.Literal("assistant"),
-          Type.Literal("tool_call"),
-          Type.Literal("tool_result"),
-          Type.Literal("event"),
-        ]),
+    parameters: obj({
+      query: opt(str({ description: "Words that must all appear, case-insensitive." })),
+      tool: opt(str({ description: "Only calls to and results from this tool, for example bash." })),
+      entry: opt(int({ minimum: 1, description: "Read this one entry in full." })),
+      kind: opt(
+        oneOf(["user", "assistant", "tool_call", "tool_result", "event"]),
       ),
-      from_entry: Type.Optional(Type.Integer({ minimum: 1, description: "Oldest entry number to include." })),
-      to_entry: Type.Optional(Type.Integer({ minimum: 1, description: "Newest entry number to include." })),
-      order: Type.Optional(Type.Union([Type.Literal("newest"), Type.Literal("oldest")])),
-      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50, description: "Results per page. Default 10." })),
-      offset: Type.Optional(Type.Integer({ minimum: 0, description: "Results to skip. Default 0." })),
+      from_entry: opt(int({ minimum: 1, description: "Oldest entry number to include." })),
+      to_entry: opt(int({ minimum: 1, description: "Newest entry number to include." })),
+      order: opt(oneOf(["newest", "oldest"])),
+      limit: opt(int({ minimum: 1, maximum: 50, description: "Results per page. Default 10." })),
+      offset: opt(int({ minimum: 0, description: "Results to skip. Default 0." })),
     }),
     replay: "safe",
     execute: async (args, api, ctx) => {
@@ -351,7 +343,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
         activeFrom,
         lastReset: resets.length ? Math.max(...resets) : undefined,
       });
-      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      return { output: [{ type: "text", text: JSON.stringify(result) }] };
     },
   });
   // No replay policy: the default `unsafe` means a crash mid-call returns an interrupted result and never pages twice.
@@ -359,9 +351,9 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "ping_on_call_engineer",
     description:
       "Page the human on-call engineer with a short summary. A real side effect: it is not replay-safe, so a crash returns an interrupted result instead of paging again, and it works once per agent. Only use it when the user asks you to page someone.",
-    parameters: Type.Object({
-      summary: Type.String({ description: "What the engineer needs to know, one or two sentences." }),
-      severity: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("high"), Type.Literal("critical")])),
+    parameters: obj({
+      summary: str({ description: "What the engineer needs to know, one or two sentences." }),
+      severity: opt(oneOf(["low", "high", "critical"])),
     }),
     execute: async (args, api, ctx) => {
       const prior = await api.snapshot(Pager, api.conversationId, ctx);
@@ -382,7 +374,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       await pause(1500);
       api.output("Acknowledged.\n");
       return {
-        content: [
+        output: [
           {
             type: "text",
             text: `Paged the on-call engineer (${page}, ${severity}). They acknowledged. Do not page again for this.`,
@@ -395,7 +387,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "subagent",
     description:
       "Delegate a self-contained task to an owned child conversation. Parent interruption also interrupts the child.",
-    parameters: Type.Object({ task: Type.String() }),
+    parameters: obj({ task: str() }),
     replay: "safe",
     execute: async (args, api, ctx) => {
       const id = await api.commit(async (tx) => {
@@ -421,7 +413,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
           ? await api.commit((tx) => tx.entry(AssistantEntry, result.answer), ctx)
           : undefined;
       return {
-        content: [
+        output: [
           { type: "text", text: answer ? JSON.stringify(answer.model) : JSON.stringify(result) },
         ],
         details: { conversationId: id },
@@ -432,16 +424,16 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "start_session",
     description:
       "Start a new session on this device: its own harness, database and working directory, independent of this one. It keeps running if you are interrupted. Returns immediately; you do not wait for it.",
-    parameters: Type.Object({
-      name: Type.String({ description: "Session name shown in the network tree." }),
-      cwd: Type.String({
+    parameters: obj({
+      name: str({ description: "Session name shown in the network tree." }),
+      cwd: str({
         description: "Existing folder on this device. Relative paths resolve against your working directory.",
       }),
-      model: Type.Optional(
-        Type.String({ description: "Model id from this device's model list. Default: your current model." }),
+      model: opt(
+        str({ description: "Model id from this device's model list. Default: your current model." }),
       ),
-      prompt: Type.Optional(
-        Type.String({ description: "First message for the new session. Default: none, the session starts idle." }),
+      prompt: opt(
+        str({ description: "First message for the new session. Default: none, the session starts idle." }),
       ),
     }),
     replay: "safe",
@@ -463,7 +455,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
           ? "It has no prompt yet."
           : `Sent its first message as submission #${submissionId}. It runs on its own.`;
       return {
-        content: [
+        output: [
           {
             type: "text",
             text: `Started session "${session.name}" (${session.id}) in ${session.cwd} with ${session.model}. ${sent}`,
@@ -477,9 +469,9 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     name: "handoff",
     description:
       "Start a fresh model context with a concise handoff note. Old transcript stays stored.",
-    parameters: Type.Object({ note: Type.String() }),
+    parameters: obj({ note: str() }),
     execute: async (args) => ({
-      content: [{ type: "text", text: "Context handed off." }],
+      output: [{ type: "text", text: "Context handed off." }],
       control: { handoff: args.note },
     }),
   });

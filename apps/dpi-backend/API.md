@@ -66,19 +66,19 @@ Agents use the playground tools: `list_durable_jobs` (ids, phases, inputs, appro
 
 ## Streams
 
-Server-Sent Events. Each connection sends `hello`, then a snapshot, then deltas, plus a `: ping` comment every 15s. Treat 45s of silence as a dead socket. Reconnects get a fresh snapshot and nothing is replayed (pi-durable's watch semantics). A viewer that falls 2 MB behind is disconnected. Closing a stream never stops work.
+Server-Sent Events. Each connection sends `hello`, then a snapshot, then deltas, plus a `: ping` comment every 15s. Agent streams are derived from pi-durable 1.5 conversation views: one full snapshot on attach, then `view` frames no more than 10x a second. Treat 45s of silence as a dead socket. Reconnects get a fresh snapshot and nothing is replayed (pi-durable's watch semantics). A viewer that falls 2 MB behind is disconnected. Closing a stream never stops work.
 
 ```
 id: 7
-event: batch
-data: {"type":"batch","events":[{"type":"message_update", ...}]}
+event: view
+data: {"type":"view","view":{"entries":[...],"tools":[{"callId":"call_1","name":"bash","status":"running","output":"line1\n"}]}}
 ```
 
 | Scope | Frames |
 |---|---|
 | device `/v1/events` | `tree {tree}` (deduped, coalesced 250ms), `activity {items:[{type:"agent.started"\|"agent.finished", sessionId, agentId, at, preview?}]}`, `doc {kind, value, revision}` |
 | session `/v1/sessions/:s/events` | `session {agents, tasks, usage}`, then `agents`, `tasks`, `usage` |
-| agent `.../agents/:a/events` | `snapshot {snapshot, inbox}`, `batch {events}` (pi-durable `watchEvents()` verbatim), `inbox {items}` (queued content), `doc {kind, value}` |
+| agent `.../agents/:a/events` | `snapshot {snapshot, inbox}` (full state, also on reconnect), `view {view}` (deltas: appended entries, live generation, tool slots, run, usage; `null` clears), `inbox {items}` (queued content), `doc {kind, value}` |
 | all | `hello {apiVersion, scope, serverTime}` |
 
 The hub's multiplexed stream (`/api/stream`) carries these frames per subscription and adds `stream {streamId}`, `network {devices}`, `fault {error}` and `disconnected {reason}`.

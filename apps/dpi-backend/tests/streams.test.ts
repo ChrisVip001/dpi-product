@@ -57,9 +57,15 @@ test("agent, session and device streams carry snapshots and deltas that reduce t
     await until(async () => !model.state.running && model.state.items.filter((i) => i.kind === "assistant").length >= 2, 15000, "run end");
     const server_items = (await main.transcript("json")).items;
     assert.deepEqual(JSON.parse(JSON.stringify(model.state.items)), server_items);
-    const types = new Set(agentFrames.flatMap((f) => (f.type === "batch" ? f.events.map((e) => e.type) : [])));
-    for (const expected of ["run_start", "message_start", "message_end", "tool_execution_start", "tool_execution_update", "tool_execution_end", "run_end"])
-      assert.ok(types.has(expected as never), `missing ${expected}`);
+    // 1.5 devices send view deltas instead of an agent event stream.
+    const views = agentFrames.flatMap((f) => (f.type === "view" ? [f.view] : []));
+    assert.ok(views.some((v) => v.run && v.run.inputs.length > 0), "missing run start");
+    // Live state (a partial generation or a running tool slot) travels in view frames.
+    assert.ok(views.some((v) => v.generation?.message || (v.tools ?? []).some((t) => t.status === "running")), "missing live state");
+    assert.ok(views.some((v) => v.tools?.some((tool) => tool.status === "running")), "missing running tool slot");
+    assert.ok(views.some((v) => v.tools?.length === 0, ), "missing cleared tool slots");
+    assert.ok(views.some((v) => v.run === null), "missing run end");
+    assert.ok(views.some((v) => v.entries?.length), "missing committed entries");
     // A long reply streams partial text through message_update deltas.
     let sawPartial = false;
     const unsub = model.subscribe(() => {
@@ -70,7 +76,12 @@ test("agent, session and device streams carry snapshots and deltas that reduce t
     await until(async () => !model.state.running && model.state.items.filter((i) => i.kind === "assistant").length >= 3, 20000, "slow reply");
     unsub();
     assert.ok(sawPartial, "saw streamed partial text");
-    assert.ok(agentFrames.some((f) => f.type === "batch" && f.events.some((e) => e.type === "message_update")), "message_update frames");
+    assert.ok(
+      agentFrames.some(
+        (f) => f.type === "view" && (f.view.generation?.message?.content ?? []).some((b) => b.type === "text" && b.text.length > 10),
+      ),
+      "partial text frames",
+    );
     // RECORD_FIXTURES=1 saves the real frame log as the SDK fixture.
     if (process.env.RECORD_FIXTURES) {
       const fixtures = join(import.meta.dirname, "../../dpi-sdk/tests/fixtures");

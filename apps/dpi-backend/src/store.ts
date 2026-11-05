@@ -228,7 +228,6 @@ export class Store {
     try {
       store.unlockShared = lockFile(`${store.sharedStatePath}.lock`);
       store.shared = await SharedState.open(store.sharedStatePath);
-      store.shared.harness.subscribeCommits(() => store.notify());
       for (const row of store.list()) {
         try {
           await store.openAgent(row);
@@ -570,8 +569,7 @@ export class Store {
       row.provider = rootModel.provider;
       row.model = rootModel.modelId;
       this.catalog.prepare("UPDATE sessions SET provider=?,model=? WHERE id=?").run(row.provider, row.model, row.id);
-      const unsubscribe = harness.subscribeCommits(() => this.notify());
-      this.opened.set(row.id, { harness, unlock, unsubscribe, jobs, addons });
+      this.opened.set(row.id, { harness, unlock, unsubscribe: () => {}, jobs, addons });
       this.errors.delete(row.id);
       if (create) harness.resume();
       return harness;
@@ -639,11 +637,11 @@ export class Store {
   }
 
   async liveTasks(h: Harness): Promise<TaskNode[]> {
-    const graph = await h.taskGraph(ctx);
+    const graph = await h.watchTaskGraph(ctx);
     try {
       return await this.labelTasks(h, Object.values(graph.value.tasks).map((t) => this.taskNode(t)));
     } finally {
-      graph.dispose();
+      await graph.stop();
     }
   }
 
@@ -909,11 +907,11 @@ export class Store {
   }
 
   async activeEntries(c: Conversation): Promise<WireEntry[]> {
-    const view = await c.viewState(ctx);
+    const view = await c.watch(ctx, { min: 50, max: 1000 });
     try {
       return JSON.parse(JSON.stringify(view.value.entries)) as WireEntry[];
     } finally {
-      view.dispose();
+      await view.stop();
     }
   }
 
