@@ -62,8 +62,18 @@ import { createPlayground, Workspace, type SpawnSession } from "./extensions.js"
 import { createJobs, JobRuns, JOB_DEFS, jobDef, resolveJobInput, type Jobs } from "./jobs.js";
 import { ADDON_INFO, createAddons, PROMPTS, PromptChecklist, type Addons } from "./addons.js";
 import { JOB_RUNS_DOC } from "../../dpi-sdk/src/jobs.js";
+import { createRequire } from "node:module";
 
-export const DURABLE_VERSION = "1.0.3";
+/** The runtime version this device actually loaded, read from the installed package. */
+export const DURABLE_VERSION: string = (() => {
+  try {
+    const entry = createRequire(import.meta.url).resolve("@earendil-works/pi-durable");
+    const manifest = join(dirname(entry), "..", "package.json");
+    return (JSON.parse(readFileSync(manifest, "utf8")) as { version: string }).version;
+  } catch {
+    return "unknown";
+  }
+})();
 
 /** Tools that create, update or delete: shell, files, App State, job runs, sessions, pages and subagents. */
 export const WRITE_TOOLS = new Set([

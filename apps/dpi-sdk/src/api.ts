@@ -1,9 +1,9 @@
 // The Durable Agent Network wire contract: every JSON body and stream frame between
 // dpi-backend and its clients. Types only, so browsers, Node and the TUI share it.
 //
-// Agent events are pi-durable 1.0.3's `watchEvents()` output passed through verbatim.
-// The Wire* event types below copy their JSON shape; apps/dpi-backend/src/contract-check.ts
-// fails the build if pi-durable's own types stop fitting them.
+// Agent state is derived from pi-durable 1.5 conversation views: `snapshot` on attach, then `view`
+// deltas (appended entries, live generation, tool slots, run state). The Wire* types below are the
+// contract; apps/dpi-backend/src/contract-check.ts fails the build if the mapping stops fitting them.
 
 import type { JobDef } from "./jobs.js";
 

@@ -60,6 +60,7 @@ Devices are data: `dpi-network.yaml` declares each one by kind (`local`, `ssh`, 
 ## Guarantees and boundaries
 
 - Closing a client never stops work. A backend restart resumes unfinished tasks from their checkpoints. Replay-safe tools rerun; unsafe ones return an interrupted result.
+- Agent streams are derived from pi-durable conversation views: one `snapshot` on attach, then `view` deltas (appended entries, the live generation, tool slots). Reconnecting always gets a fresh snapshot and no replay.
 - A token holder has the agent's shell and filesystem access on that device. Start dirs are where sessions begin, not a sandbox.
 - `dpi-backend` binds `127.0.0.1` unless told otherwise.
 - `pi-durable` is experimental: every minor version may break the API. Versions are pinned exactly and `package-lock.json` is committed.
