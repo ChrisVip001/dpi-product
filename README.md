@@ -55,6 +55,15 @@ just test device <id>      # real-model suites on one device
 just test e2e <id>         # TUI + web + restart mid-tool + fork
 ```
 
+Runtime data lives in `~/.dpi` by default. To keep an existing 1.0.3 device untouched, point a second instance elsewhere:
+
+```bash
+DPI_ENV_FILE=~/.dpi-product/backend.env npx tsx src/main.ts   # in apps/dpi-backend
+# that env file holds DPI_TOKEN, DPI_PORT, DPI_DATA_DIR, DPI_START_DIRS and the provider keys
+```
+
+pi-durable 1.4+ migrates the SQLite schema to v2 and **cannot be rolled back**; back up any data dir you care about.
+
 Devices are data: `dpi-network.yaml` declares each one by kind (`local`, `ssh`, `exe-dev`, `url`). No code or recipe names a machine, and tokens never live in the YAML.
 
 ## Guarantees and boundaries
