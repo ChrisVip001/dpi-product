@@ -160,6 +160,7 @@ export class Store {
   readonly catalog: DatabaseSync;
   readonly startedAt = Date.now();
   shared!: SharedState;
+  sharedCommits?: { detach(): void };
   uid!: string;
   modelList: ModelInfo[] = [];
   private unlockCatalog: () => void;
@@ -238,6 +239,10 @@ export class Store {
     try {
       store.unlockShared = lockFile(`${store.sharedStatePath}.lock`);
       store.shared = await SharedState.open(store.sharedStatePath);
+      store.sharedCommits = store.shared.harness.observeCommits({
+        advance: () => store.notify(),
+        end: () => {},
+      });
       for (const row of store.list()) {
         try {
           await store.openAgent(row);
@@ -579,7 +584,9 @@ export class Store {
       row.provider = rootModel.provider;
       row.model = rootModel.modelId;
       this.catalog.prepare("UPDATE sessions SET provider=?,model=? WHERE id=?").run(row.provider, row.model, row.id);
-      this.opened.set(row.id, { harness, unlock, unsubscribe: () => {}, jobs, addons });
+      // 1.5: commit subscriptions live on the Session now, and a commit is still the best "something changed" signal.
+      const commits = harness.observeCommits({ advance: () => this.notify(), end: () => {} });
+      this.opened.set(row.id, { harness, unlock, unsubscribe: () => commits.detach(), jobs, addons });
       this.errors.delete(row.id);
       if (create) harness.resume();
       return harness;
@@ -1197,6 +1204,7 @@ export class Store {
   // ------------------------------------------------------------ lifecycle
 
   async close() {
+    this.sharedCommits?.detach();
     for (const { harness, unlock, unsubscribe } of this.opened.values()) {
       unsubscribe();
       try {

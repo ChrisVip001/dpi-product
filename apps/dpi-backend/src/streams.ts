@@ -152,12 +152,7 @@ export function deviceStream(store: Store, req: Request, res: Response) {
     }
   }, 250);
   sse.onClose(store.subscribe(push));
-  // 1.5 dropped commit subscriptions: poll the tree so busy -> idle still produces activity.
-  const tick = setInterval(() => push(), 1000);
-  sse.onClose(() => {
-    clearInterval(tick);
-    push.cancel();
-  });
+  sse.onClose(() => push.cancel());
   void push.now();
 }
 
@@ -182,13 +177,10 @@ export async function sessionStream(store: Store, row: SessionRow, res: Response
     sse.sendIfChanged("agents", { type: "agents", agents: await store.agents(row, tasks) });
     sse.sendIfChanged("usage", { type: "usage", usage: await store.usage(h) });
   }, 250);
-  // 1.5 dropped commit subscriptions: the graph watch covers task changes, and a cheap tick keeps
-  // agents/usage fresh (sendIfChanged drops unchanged frames).
-  const tick = setInterval(() => push(), 1000);
-  // Agent names live in the device catalog, not the harness: a rename only fires the store's change feed.
+  // The store notifies on every commit (Session.observeCommits) and on catalog changes, so agents
+  // and usage are pushed as soon as the device sees them.
   const offCatalog = store.subscribe(() => push());
   sse.onClose(() => {
-    clearInterval(tick);
     offCatalog();
     push.cancel();
     void watch.stop();
@@ -237,10 +229,11 @@ export async function agentStream(
     pushInbox();
     if (docs.length) pushDocs();
   });
-  // Custom documents are not part of the view: poll them, cheaply and only while a viewer asked.
-  const tick = docs.length ? setInterval(() => pushDocs(), 1000) : undefined;
+  // Custom documents can be task-scoped, so they do not always publish the conversation view:
+  // every commit (Session.observeCommits in the store) nudges them instead.
+  const offDocs = docs.length ? store.subscribe(() => pushDocs()) : () => {};
   sse.onClose(() => {
-    if (tick) clearInterval(tick);
+    offDocs();
     push.cancel();
     pushInbox.cancel();
     pushDocs.cancel();
