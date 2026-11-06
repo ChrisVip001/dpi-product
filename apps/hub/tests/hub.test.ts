@@ -205,8 +205,7 @@ test("hub: registry from YAML, monitoring, token-injecting proxy, guard, mux, of
         frames.some(
           (f) =>
             f.sub === subs[1] &&
-            (f.frame.type === "view" && f.frame.view.run === null) ||
-            (f.frame.type === "batch" && f.frame.events.some((e) => e.type === "run_end")),
+            f.frame.type === "view" && f.frame.view.run === null,
         ),
       10000,
       "run end via mux",

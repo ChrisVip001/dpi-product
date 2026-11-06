@@ -3,10 +3,10 @@
   {
    "type": "hello",
    "apiVersion": 1,
-   "serverTime": 1791233652705,
+   "serverTime": 1793938725043,
    "scope": {
     "kind": "agent",
-    "sessionId": "39b80fe9-b934-4b53-b4ec-a085db5f26c8",
+    "sessionId": "9b2e99fe-53d2-4330-b796-eb94124fe8ce",
     "agentId": 1
    }
   },
@@ -24,7 +24,7 @@
       "modelId": "echo"
      },
      "thinkingLevel": "low",
-     "cwd": "/private/var/folders/vg/6n7pjmsj4wv2t04_5x_h2pcc0000gn/T/dpi-be-DutJxd/work"
+     "cwd": "/private/var/folders/hg/qjjpjx9x3vld8dw_w4nw5rcw0000gn/T/dpi-be-e2rPDV/work"
     },
     "usage": {
      "models": {},
@@ -35,310 +35,42 @@
   },
   {
    "type": "doc",
-   "kind": "demo.jobs",
+   "kind": "demo.job-runs",
    "value": {
+    "counts": {},
     "items": {}
    }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_start",
-     "message": {
-      "role": "user",
-      "content": "!for i in 1 2 3; do echo line$i; sleep 0.4; done",
-      "timestamp": 1791233652807
-     }
-    },
-    {
-     "type": "message_end",
-     "entry": {
+   "type": "view",
+   "view": {
+    "entries": [
+     {
       "model": [
        {
         "role": "user",
         "content": "!for i in 1 2 3; do echo line$i; sleep 0.4; done",
-        "timestamp": 1791233652807
+        "timestamp": 1793938725142
        }
       ],
       "kind": "pi.user",
       "id": 9,
       "conversationId": 1
-     }
-    },
-    {
-     "type": "submission",
-     "record": {
-      "conversationId": 1,
-      "requestId": "s-1",
-      "type": "input",
-      "status": "placed",
-      "entry": 9,
-      "id": 10
-     }
-    },
-    {
-     "type": "run_start",
-     "inputs": [
-      10
-     ]
-    },
-    {
-     "type": "turn_start"
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_start",
-     "message": {
-      "role": "system",
-      "content": "",
-      "sections": {
-       "playground": "You are a concise coding agent in the Durable Pi playground. Explain only what matters. You have read, write, edit, bash and durable demo tools. Use read_state to inspect App State and update_state to create, update, delete, or increment any field. App State is shared across all agents, sessions, conversations and forks in this demo. It survives browser closure, interrupted agents, and backend restarts. Forks use the current shared object rather than a historical copy. Read before writing because other agents and humans can change it. Use only read_state and update_state for this object, never inspect or edit its database files. App State is a flexible JSON object: numbers, booleans, strings, arrays, nested objects, and null all render as live controls in the UI. Read before editing. Use durable_job for checkpoint demos and approval workflows. Use subagent only when explicitly asked to delegate. Never claim an action happened without using its tool. Background jobs finish independently; do not wait in bash. A browser disconnect does not stop your work."
-      },
-      "toolsAdded": [
-       {
-        "name": "read",
-        "description": "Read the contents of a text file. Output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
-        "parameters": {
-         "type": "object",
-         "required": [
-          "path"
-         ],
-         "properties": {
-          "path": {
-           "type": "string",
-           "description": "Path to the file to read (relative or absolute)"
-          },
-          "offset": {
-           "type": "number",
-           "description": "Line number to start reading from (1-indexed)"
-          },
-          "limit": {
-           "type": "number",
-           "description": "Maximum number of lines to read"
-          }
-         }
-        }
-       },
-       {
-        "name": "write",
-        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
-        "parameters": {
-         "type": "object",
-         "required": [
-          "path",
-          "content"
-         ],
-         "properties": {
-          "path": {
-           "type": "string",
-           "description": "Path to the file to write (relative or absolute)"
-          },
-          "content": {
-           "type": "string",
-           "description": "Content to write to the file"
-          }
-         }
-        }
-       },
-       {
-        "name": "edit",
-        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
-        "parameters": {
-         "type": "object",
-         "required": [
-          "path",
-          "edits"
-         ],
-         "properties": {
-          "path": {
-           "type": "string",
-           "description": "Path to the file to edit (relative or absolute)"
-          },
-          "edits": {
-           "type": "array",
-           "items": {
-            "type": "object",
-            "required": [
-             "oldText",
-             "newText"
-            ],
-            "properties": {
-             "oldText": {
-              "type": "string",
-              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
-             },
-             "newText": {
-              "type": "string",
-              "description": "Replacement text for this targeted edit."
-             }
-            }
-           },
-           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
-          }
-         }
-        }
-       },
-       {
-        "name": "bash",
-        "description": "Execute a bash command in the current working directory. Returns combined stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
-        "parameters": {
-         "type": "object",
-         "required": [
-          "command"
-         ],
-         "properties": {
-          "command": {
-           "type": "string",
-           "description": "Bash command to execute"
-          },
-          "timeout": {
-           "type": "number",
-           "description": "Timeout in seconds (optional, no default timeout)"
-          }
-         }
-        }
-       },
-       {
-        "name": "read_state",
-        "description": "Read the shared App State object used by every session, conversation and fork, or a field at a JSON Pointer path. Empty path reads the whole object.",
-        "parameters": {
-         "type": "object",
-         "properties": {
-          "path": {
-           "type": "string"
-          }
-         }
-        }
-       },
-       {
-        "name": "update_state",
-        "description": "CRUD the same shared App State for every agent and fork in this demo. create adds a new field, update replaces an existing value, delete removes it, increment adds a signed number. value_json must be JSON-encoded text: 3 for a number, true for a boolean, \"hello\" (including quotes) for a string, {\"enabled\":true} for an object, or [1,2] for an array. Omit value_json for delete. Use JSON Pointer paths: /counter, /settings/enabled, /notes/- to append. Escape ~ as ~0 and / as ~1. Empty path with update replaces the whole root object, with delete clears it. Read first with read_state. UI controls update live. Changes are atomic and replay-safe.",
-        "parameters": {
-         "type": "object",
-         "required": [
-          "operation",
-          "path"
-         ],
-         "properties": {
-          "operation": {
-           "anyOf": [
-            {
-             "type": "string",
-             "const": "create"
-            },
-            {
-             "type": "string",
-             "const": "update"
-            },
-            {
-             "type": "string",
-             "const": "delete"
-            },
-            {
-             "type": "string",
-             "const": "increment"
-            }
-           ]
-          },
-          "path": {
-           "type": "string"
-          },
-          "value_json": {
-           "type": "string",
-           "description": "JSON-encoded value. Objects and arrays must be encoded as JSON here, not passed as native tool argument objects."
-          }
-         }
-        }
-       },
-       {
-        "name": "durable_job",
-        "description": "Start a checkpointed job. Can run in background across browser disconnects and server restarts. Optional human approval halfway through. Returns the durable task ID immediately.",
-        "parameters": {
-         "type": "object",
-         "required": [
-          "label"
-         ],
-         "properties": {
-          "label": {
-           "type": "string"
-          },
-          "steps": {
-           "type": "integer",
-           "minimum": 2,
-           "maximum": 60
-          },
-          "seconds": {
-           "type": "integer",
-           "minimum": 1,
-           "maximum": 30
-          },
-          "approval": {
-           "type": "boolean"
-          },
-          "background": {
-           "type": "boolean"
-          }
-         }
-        }
-       },
-       {
-        "name": "subagent",
-        "description": "Delegate a self-contained task to an owned child conversation. Parent interruption also interrupts the child.",
-        "parameters": {
-         "type": "object",
-         "required": [
-          "task"
-         ],
-         "properties": {
-          "task": {
-           "type": "string"
-          }
-         }
-        }
-       },
-       {
-        "name": "handoff",
-        "description": "Start a fresh model context with a concise handoff note. Old transcript stays stored.",
-        "parameters": {
-         "type": "object",
-         "required": [
-          "note"
-         ],
-         "properties": {
-          "note": {
-           "type": "string"
-          }
-         }
-        }
-       }
-      ],
-      "timestamp": 1791233652811
-     }
-    },
-    {
-     "type": "message_end",
-     "entry": {
+     },
+     {
       "model": [
        {
         "role": "system",
         "content": "",
         "sections": {
-         "playground": "You are a concise coding agent in the Durable Pi playground. Explain only what matters. You have read, write, edit, bash and durable demo tools. Use read_state to inspect App State and update_state to create, update, delete, or increment any field. App State is shared across all agents, sessions, conversations and forks in this demo. It survives browser closure, interrupted agents, and backend restarts. Forks use the current shared object rather than a historical copy. Read before writing because other agents and humans can change it. Use only read_state and update_state for this object, never inspect or edit its database files. App State is a flexible JSON object: numbers, booleans, strings, arrays, nested objects, and null all render as live controls in the UI. Read before editing. Use durable_job for checkpoint demos and approval workflows. Use subagent only when explicitly asked to delegate. Never claim an action happened without using its tool. Background jobs finish independently; do not wait in bash. A browser disconnect does not stop your work."
+         "playground": "You are a concise coding agent in the dpi-product playground. Explain only what matters. Use only the tools you are offered; read only agents get no tools that write. Use read_state to inspect App State and update_state to create, update, delete, or increment any field. App State is shared across all agents, sessions, conversations and forks in this demo. It survives browser closure, interrupted agents, and backend restarts. Forks use the current shared object rather than a historical copy. Read before writing because other agents and humans can change it. Use only read_state and update_state for this object, never inspect or edit its database files. App State is a flexible JSON object: numbers, booleans, strings, arrays, nested objects, and null all render as live controls in the UI. Read before editing. Use list_durable_jobs and run_durable_job to run a repeatable durable job (a named workflow with checkpointed phases) when asked; pass only the inputs list_durable_jobs documents. Runs continue in the background: check them with check_durable_job, and wait only when asked. Use search_history to look back at earlier messages, tool calls or entries by number, including what came before a reset, handoff or compaction. Use ping_on_call_engineer only when asked to page someone; it works once. Use subagent only when explicitly asked to delegate. Use start_session only when asked to start a new session; it runs on its own. Never claim an action happened without using its tool. Background runs finish independently; do not wait in bash. A browser disconnect does not stop your work."
         },
         "toolsAdded": [
          {
           "name": "read",
-          "description": "Read the contents of a text file. Output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+          "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
           "parameters": {
            "type": "object",
-           "required": [
-            "path"
-           ],
            "properties": {
             "path": {
              "type": "string",
@@ -352,7 +84,10 @@
              "type": "number",
              "description": "Maximum number of lines to read"
             }
-           }
+           },
+           "required": [
+            "path"
+           ]
           }
          },
          {
@@ -360,10 +95,6 @@
           "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
           "parameters": {
            "type": "object",
-           "required": [
-            "path",
-            "content"
-           ],
            "properties": {
             "path": {
              "type": "string",
@@ -373,7 +104,11 @@
              "type": "string",
              "description": "Content to write to the file"
             }
-           }
+           },
+           "required": [
+            "path",
+            "content"
+           ]
           }
          },
          {
@@ -381,10 +116,6 @@
           "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
           "parameters": {
            "type": "object",
-           "required": [
-            "path",
-            "edits"
-           ],
            "properties": {
             "path": {
              "type": "string",
@@ -394,10 +125,6 @@
              "type": "array",
              "items": {
               "type": "object",
-              "required": [
-               "oldText",
-               "newText"
-              ],
               "properties": {
                "oldText": {
                 "type": "string",
@@ -407,11 +134,19 @@
                 "type": "string",
                 "description": "Replacement text for this targeted edit."
                }
-              }
+              },
+              "required": [
+               "oldText",
+               "newText"
+              ]
              },
              "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
             }
-           }
+           },
+           "required": [
+            "path",
+            "edits"
+           ]
           }
          },
          {
@@ -419,9 +154,6 @@
           "description": "Execute a bash command in the current working directory. Returns combined stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
           "parameters": {
            "type": "object",
-           "required": [
-            "command"
-           ],
            "properties": {
             "command": {
              "type": "string",
@@ -431,7 +163,10 @@
              "type": "number",
              "description": "Timeout in seconds (optional, no default timeout)"
             }
-           }
+           },
+           "required": [
+            "command"
+           ]
           }
          },
          {
@@ -443,7 +178,8 @@
             "path": {
              "type": "string"
             }
-           }
+           },
+           "additionalProperties": false
           }
          },
          {
@@ -451,29 +187,13 @@
           "description": "CRUD the same shared App State for every agent and fork in this demo. create adds a new field, update replaces an existing value, delete removes it, increment adds a signed number. value_json must be JSON-encoded text: 3 for a number, true for a boolean, \"hello\" (including quotes) for a string, {\"enabled\":true} for an object, or [1,2] for an array. Omit value_json for delete. Use JSON Pointer paths: /counter, /settings/enabled, /notes/- to append. Escape ~ as ~0 and / as ~1. Empty path with update replaces the whole root object, with delete clears it. Read first with read_state. UI controls update live. Changes are atomic and replay-safe.",
           "parameters": {
            "type": "object",
-           "required": [
-            "operation",
-            "path"
-           ],
            "properties": {
             "operation": {
-             "anyOf": [
-              {
-               "type": "string",
-               "const": "create"
-              },
-              {
-               "type": "string",
-               "const": "update"
-              },
-              {
-               "type": "string",
-               "const": "delete"
-              },
-              {
-               "type": "string",
-               "const": "increment"
-              }
+             "enum": [
+              "create",
+              "update",
+              "delete",
+              "increment"
              ]
             },
             "path": {
@@ -483,38 +203,158 @@
              "type": "string",
              "description": "JSON-encoded value. Objects and arrays must be encoded as JSON here, not passed as native tool argument objects."
             }
-           }
+           },
+           "required": [
+            "operation",
+            "path"
+           ],
+           "additionalProperties": false
           }
          },
          {
-          "name": "durable_job",
-          "description": "Start a checkpointed job. Can run in background across browser disconnects and server restarts. Optional human approval halfway through. Returns the durable task ID immediately.",
+          "name": "list_durable_jobs",
+          "description": "List the durable jobs you can start with run_durable_job: each job's id, what it does, its named phases, the inputs it takes (type, default, limits), whether it waits for a person's approval, the App State path where every run saves its result, and its recent runs in this conversation with their task ids for check_durable_job.",
           "parameters": {
            "type": "object",
-           "required": [
-            "label"
-           ],
+           "properties": {},
+           "additionalProperties": false
+          }
+         },
+         {
+          "name": "run_durable_job",
+          "description": "Start a durable job: a repeatable workflow with named phases that runs as one checkpointed task and shows live in the chat. Call list_durable_jobs first for ids and inputs. It runs in the background: you get its task id at once, the conversation owns the run, and you check it with check_durable_job. Set wait true only when the user wants you to wait for the result; then the call owns the run, an interrupt stops it, and you get the outcome of every phase. Example: {\"job\":\"workspace-snapshot\",\"input\":{\"path\":\".\"}}.",
+          "parameters": {
+           "type": "object",
            "properties": {
-            "label": {
-             "type": "string"
+            "job": {
+             "type": "string",
+             "description": "Job id from list_durable_jobs."
             },
-            "steps": {
-             "type": "integer",
-             "minimum": 2,
-             "maximum": 60
+            "input": {
+             "type": "object",
+             "additionalProperties": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "number"
+               }
+              ]
+             },
+             "description": "The job's inputs by name. Omitted inputs use their defaults."
             },
-            "seconds": {
+            "wait": {
+             "type": "boolean",
+             "description": "Wait for the run to finish, including any approval. Default false."
+            }
+           },
+           "required": [
+            "job"
+           ],
+           "additionalProperties": false
+          }
+         },
+         {
+          "name": "check_durable_job",
+          "description": "Check durable job runs in this conversation. With task_id, one run in full: status, current phase, every phase's outcome and steps (commands, the subagent's tool calls, App State writes), approval, result or error. With job, that job's latest run. With neither, a short list of recent runs. Task ids come from run_durable_job and list_durable_jobs.",
+          "parameters": {
+           "type": "object",
+           "properties": {
+            "task_id": {
              "type": "integer",
              "minimum": 1,
-             "maximum": 30
+             "description": "The run's task id."
             },
-            "approval": {
-             "type": "boolean"
-            },
-            "background": {
-             "type": "boolean"
+            "job": {
+             "type": "string",
+             "description": "A job id: check its latest run."
             }
-           }
+           },
+           "additionalProperties": false
+          }
+         },
+         {
+          "name": "search_history",
+          "description": "Search your own full stored history, including entries from before a reset, handoff or compaction that you can no longer see. Filter by words (query), by tool name (tool), by entry kind, or by entry number range (from_entry, to_entry). Pass entry to read one entry in full by its number. Results come newest first (order oldest to reverse) and are paged with limit and offset; use next_offset for the next page. Each result says whether the entry is active, compacted or before reset.",
+          "parameters": {
+           "type": "object",
+           "properties": {
+            "query": {
+             "type": "string",
+             "description": "Words that must all appear, case-insensitive."
+            },
+            "tool": {
+             "type": "string",
+             "description": "Only calls to and results from this tool, for example bash."
+            },
+            "entry": {
+             "type": "integer",
+             "minimum": 1,
+             "description": "Read this one entry in full."
+            },
+            "kind": {
+             "enum": [
+              "user",
+              "assistant",
+              "tool_call",
+              "tool_result",
+              "event"
+             ]
+            },
+            "from_entry": {
+             "type": "integer",
+             "minimum": 1,
+             "description": "Oldest entry number to include."
+            },
+            "to_entry": {
+             "type": "integer",
+             "minimum": 1,
+             "description": "Newest entry number to include."
+            },
+            "order": {
+             "enum": [
+              "newest",
+              "oldest"
+             ]
+            },
+            "limit": {
+             "type": "integer",
+             "minimum": 1,
+             "maximum": 50,
+             "description": "Results per page. Default 10."
+            },
+            "offset": {
+             "type": "integer",
+             "minimum": 0,
+             "description": "Results to skip. Default 0."
+            }
+           },
+           "additionalProperties": false
+          }
+         },
+         {
+          "name": "ping_on_call_engineer",
+          "description": "Page the human on-call engineer with a short summary. A real side effect: it is not replay-safe, so a crash returns an interrupted result instead of paging again, and it works once per agent. Only use it when the user asks you to page someone.",
+          "parameters": {
+           "type": "object",
+           "properties": {
+            "summary": {
+             "type": "string",
+             "description": "What the engineer needs to know, one or two sentences."
+            },
+            "severity": {
+             "enum": [
+              "low",
+              "high",
+              "critical"
+             ]
+            }
+           },
+           "required": [
+            "summary"
+           ],
+           "additionalProperties": false
           }
          },
          {
@@ -522,14 +362,45 @@
           "description": "Delegate a self-contained task to an owned child conversation. Parent interruption also interrupts the child.",
           "parameters": {
            "type": "object",
-           "required": [
-            "task"
-           ],
            "properties": {
             "task": {
              "type": "string"
             }
-           }
+           },
+           "required": [
+            "task"
+           ],
+           "additionalProperties": false
+          }
+         },
+         {
+          "name": "start_session",
+          "description": "Start a new session on this device: its own harness, database and working directory, independent of this one. It keeps running if you are interrupted. Returns immediately; you do not wait for it.",
+          "parameters": {
+           "type": "object",
+           "properties": {
+            "name": {
+             "type": "string",
+             "description": "Session name shown in the network tree."
+            },
+            "cwd": {
+             "type": "string",
+             "description": "Existing folder on this device. Relative paths resolve against your working directory."
+            },
+            "model": {
+             "type": "string",
+             "description": "Model id from this device's model list. Default: your current model."
+            },
+            "prompt": {
+             "type": "string",
+             "description": "First message for the new session. Default: none, the session starts idle."
+            }
+           },
+           "required": [
+            "name",
+            "cwd"
+           ],
+           "additionalProperties": false
           }
          },
          {
@@ -537,73 +408,27 @@
           "description": "Start a fresh model context with a concise handoff note. Old transcript stays stored.",
           "parameters": {
            "type": "object",
-           "required": [
-            "note"
-           ],
            "properties": {
             "note": {
              "type": "string"
             }
-           }
+           },
+           "required": [
+            "note"
+           ],
+           "additionalProperties": false
           }
          }
         ],
-        "timestamp": 1791233652811
+        "timestamp": 1793938725150
        }
       ],
       "kind": "pi.system",
       "id": 12,
       "conversationId": 1,
       "byTaskId": 11
-     }
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_start",
-     "message": {
-      "role": "assistant",
-      "content": [
-       {
-        "type": "text",
-        "text": "Running it."
-       },
-       {
-        "type": "toolCall",
-        "id": "tool:1791233652813:p6ykju3sndd",
-        "name": "bash",
-        "arguments": {
-         "command": "for i in 1 2 3; do echo line$i; sleep 0.4; done"
-        }
-       }
-      ],
-      "api": "faux:1791233652653:gko713ni36",
-      "provider": "faux",
-      "model": "echo",
-      "usage": {
-       "input": 1528,
-       "output": 20,
-       "cacheRead": 0,
-       "cacheWrite": 1528,
-       "totalTokens": 3076,
-       "cost": {
-        "input": 0,
-        "output": 0,
-        "cacheRead": 0,
-        "cacheWrite": 0,
-        "total": 0
-       }
-      },
-      "stopReason": "toolUse",
-      "timestamp": 1791233652813
-     }
-    },
-    {
-     "type": "message_end",
-     "entry": {
+     },
+     {
       "model": [
        {
         "role": "assistant",
@@ -614,22 +439,22 @@
          },
          {
           "type": "toolCall",
-          "id": "tool:1791233652813:p6ykju3sndd",
+          "id": "tool:1793938725156:p5s1el0txqs",
           "name": "bash",
           "arguments": {
            "command": "for i in 1 2 3; do echo line$i; sleep 0.4; done"
           }
          }
         ],
-        "api": "faux:1791233652653:gko713ni36",
+        "api": "faux:1793938724956:55ehi7z084t",
         "provider": "faux",
         "model": "echo",
         "usage": {
-         "input": 1528,
+         "input": 0,
          "output": 20,
          "cacheRead": 0,
-         "cacheWrite": 1528,
-         "totalTokens": 3076,
+         "cacheWrite": 2763,
+         "totalTokens": 2783,
          "cost": {
           "input": 0,
           "output": 0,
@@ -639,7 +464,9 @@
          }
         },
         "stopReason": "toolUse",
-        "timestamp": 1791233652813
+        "timestamp": 1793938725156,
+        "durationMs": 54,
+        "thinkingLevel": "low"
        }
       ],
       "kind": "pi.assistant",
@@ -647,193 +474,40 @@
       "conversationId": 1,
       "byTaskId": 11
      }
+    ],
+    "run": {
+     "inputs": [
+      10
+     ]
     },
-    {
-     "type": "usage_changed",
-     "usage": {
-      "models": {
-       "faux/echo": {
-        "input": 1528,
-        "output": 20,
-        "cacheRead": 0,
-        "cacheWrite": 1528,
-        "totalTokens": 3076,
-        "cost": {
-         "input": 0,
-         "output": 0,
-         "cacheRead": 0,
-         "cacheWrite": 0,
-         "total": 0
-        }
-       }
-      },
-      "tools": {}
+    "generation": null,
+    "tools": [
+     {
+      "callId": "tool:1793938725156:p5s1el0txqs",
+      "name": "bash",
+      "status": "running",
+      "taskId": 14,
+      "output": "line1\n"
      }
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "tool_execution_start",
-     "toolCallId": "tool:1791233652813:p6ykju3sndd",
-     "toolName": "bash",
-     "args": {
-      "command": "for i in 1 2 3; do echo line$i; sleep 0.4; done"
-     }
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "tool_execution_update",
-     "toolCallId": "tool:1791233652813:p6ykju3sndd",
-     "toolName": "bash",
-     "output": {
-      "set": "line1\n"
-     }
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "tool_execution_update",
-     "toolCallId": "tool:1791233652813:p6ykju3sndd",
-     "toolName": "bash",
-     "output": {
-      "append": "line2\n"
-     }
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "tool_execution_update",
-     "toolCallId": "tool:1791233652813:p6ykju3sndd",
-     "toolName": "bash",
-     "output": {
-      "append": "line3\n"
-     }
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "tool_execution_end",
-     "toolCallId": "tool:1791233652813:p6ykju3sndd",
-     "toolName": "bash",
-     "entry": {
-      "model": [
-       {
-        "role": "toolResult",
-        "toolCallId": "tool:1791233652813:p6ykju3sndd",
-        "toolName": "bash",
-        "content": [
-         {
-          "type": "text",
-          "text": "line1\nline2\nline3\n"
-         }
-        ],
-        "isError": false,
-        "timestamp": 1791233654103
-       }
-      ],
-      "data": {
-       "diagnostics": []
-      },
-      "kind": "pi.tool-result",
-      "id": 15,
-      "conversationId": 1,
-      "byTaskId": 14
-     }
-    },
-    {
-     "type": "message_start",
-     "message": {
-      "role": "toolResult",
-      "toolCallId": "tool:1791233652813:p6ykju3sndd",
-      "toolName": "bash",
-      "content": [
-       {
-        "type": "text",
-        "text": "line1\nline2\nline3\n"
-       }
-      ],
-      "isError": false,
-      "timestamp": 1791233654103
-     }
-    },
-    {
-     "type": "message_end",
-     "entry": {
-      "model": [
-       {
-        "role": "toolResult",
-        "toolCallId": "tool:1791233652813:p6ykju3sndd",
-        "toolName": "bash",
-        "content": [
-         {
-          "type": "text",
-          "text": "line1\nline2\nline3\n"
-         }
-        ],
-        "isError": false,
-        "timestamp": 1791233654103
-       }
-      ],
-      "data": {
-       "diagnostics": []
-      },
-      "kind": "pi.tool-result",
-      "id": 15,
-      "conversationId": 1,
-      "byTaskId": 14
-     }
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "turn_end"
-    },
-    {
-     "type": "turn_start"
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_start",
-     "message": {
-      "role": "assistant",
-      "content": [
-       {
-        "type": "text",
-        "text": "Tool finished: line1\nline2\nline3"
-       }
-      ],
-      "api": "faux:1791233652653:gko713ni36",
+    ],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
       "provider": "faux",
-      "model": "echo",
-      "usage": {
-       "input": 32,
-       "output": 8,
-       "cacheRead": 1528,
-       "cacheWrite": 32,
-       "totalTokens": 1600,
+      "modelId": "echo"
+     },
+     "thinkingLevel": "low",
+     "cwd": "/private/var/folders/hg/qjjpjx9x3vld8dw_w4nw5rcw0000gn/T/dpi-be-e2rPDV/work"
+    },
+    "usage": {
+     "models": {
+      "faux/echo": {
+       "input": 0,
+       "output": 20,
+       "cacheRead": 0,
+       "cacheWrite": 2763,
+       "totalTokens": 2783,
        "cost": {
         "input": 0,
         "output": 0,
@@ -841,14 +515,82 @@
         "cacheWrite": 0,
         "total": 0
        }
-      },
-      "stopReason": "stop",
-      "timestamp": 1791233654108
+      }
+     },
+     "tools": {}
+    }
+   }
+  },
+  {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "tools": [
+     {
+      "callId": "tool:1793938725156:p5s1el0txqs",
+      "name": "bash",
+      "status": "running",
+      "taskId": 14,
+      "output": "line1\nline2\n"
      }
-    },
-    {
-     "type": "message_end",
-     "entry": {
+    ]
+   }
+  },
+  {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "tools": [
+     {
+      "callId": "tool:1793938725156:p5s1el0txqs",
+      "name": "bash",
+      "status": "running",
+      "taskId": 14,
+      "output": "line1\nline2\nline3\n"
+     }
+    ]
+   }
+  },
+  {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "entries": [
+     {
+      "model": [
+       {
+        "role": "toolResult",
+        "toolCallId": "tool:1793938725156:p5s1el0txqs",
+        "toolName": "bash",
+        "content": [
+         {
+          "type": "text",
+          "text": "line1\nline2\nline3\n"
+         }
+        ],
+        "isError": false,
+        "durationMs": 1249,
+        "timestamp": 1793938726467
+       }
+      ],
+      "data": {
+       "diagnostics": []
+      },
+      "kind": "pi.tool-result",
+      "id": 15,
+      "conversationId": 1,
+      "byTaskId": 14
+     },
+     {
       "model": [
        {
         "role": "assistant",
@@ -858,15 +600,15 @@
           "text": "Tool finished: line1\nline2\nline3"
          }
         ],
-        "api": "faux:1791233652653:gko713ni36",
+        "api": "faux:1793938724956:55ehi7z084t",
         "provider": "faux",
         "model": "echo",
         "usage": {
-         "input": 32,
+         "input": 0,
          "output": 8,
-         "cacheRead": 1528,
-         "cacheWrite": 32,
-         "totalTokens": 1600,
+         "cacheRead": 2763,
+         "cacheWrite": 31,
+         "totalTokens": 2802,
          "cost": {
           "input": 0,
           "output": 0,
@@ -876,7 +618,9 @@
          }
         },
         "stopReason": "stop",
-        "timestamp": 1791233654108
+        "timestamp": 1793938726475,
+        "durationMs": 22,
+        "thinkingLevel": "low"
        }
       ],
       "kind": "pi.assistant",
@@ -884,122 +628,83 @@
       "conversationId": 1,
       "byTaskId": 16
      }
-    },
-    {
-     "type": "turn_end"
-    },
-    {
-     "type": "run_end",
-     "inputs": [
-      10
-     ]
-    },
-    {
-     "type": "submission",
-     "record": {
-      "conversationId": 1,
-      "requestId": "s-1",
-      "type": "input",
-      "status": "done",
-      "entry": 9,
-      "id": 10,
-      "answer": 17
-     }
-    },
-    {
-     "type": "usage_changed",
-     "usage": {
-      "models": {
-       "faux/echo": {
-        "input": 1560,
-        "output": 28,
-        "cacheRead": 1528,
-        "cacheWrite": 1560,
-        "totalTokens": 4676,
-        "cost": {
-         "input": 0,
-         "output": 0,
-         "cacheRead": 0,
-         "cacheWrite": 0,
-         "total": 0
-        }
+    ],
+    "run": null,
+    "tools": [],
+    "usage": {
+     "models": {
+      "faux/echo": {
+       "input": 0,
+       "output": 28,
+       "cacheRead": 2763,
+       "cacheWrite": 2794,
+       "totalTokens": 5585,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
        }
-      },
-      "tools": {}
-     }
+      }
+     },
+     "tools": {}
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_start",
-     "message": {
-      "role": "user",
-      "content": "slow: durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words ",
-      "timestamp": 1791233654241
-     }
-    },
-    {
-     "type": "message_end",
-     "entry": {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "entries": [
+     {
       "model": [
        {
         "role": "user",
         "content": "slow: durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words ",
-        "timestamp": 1791233654241
+        "timestamp": 1793938726673
        }
       ],
       "kind": "pi.user",
       "id": 18,
       "conversationId": 1
      }
-    },
-    {
-     "type": "submission",
-     "record": {
-      "conversationId": 1,
-      "requestId": "s-slow",
-      "type": "input",
-      "status": "placed",
-      "entry": 18,
-      "id": 19
-     }
-    },
-    {
-     "type": "run_start",
+    ],
+    "run": {
      "inputs": [
       19
      ]
     },
-    {
-     "type": "turn_start"
+    "generation": {
+     "attempt": 1
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_start",
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
      "message": {
       "role": "assistant",
       "content": [
        {
         "type": "text",
-        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable stre"
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wo"
        }
       ],
-      "api": "faux:1791233652653:gko713ni36",
+      "api": "faux:1793938724956:55ehi7z084t",
       "provider": "faux",
       "model": "echo",
       "usage": {
-       "input": 254,
+       "input": 0,
        "output": 959,
-       "cacheRead": 1560,
-       "cacheWrite": 255,
-       "totalTokens": 3028,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
        "cost": {
         "input": 0,
         "output": 0,
@@ -1009,713 +714,800 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1791233654244
+      "timestamp": 1793938726677
      }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words "
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "aming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable "
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streamin"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streamin"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wo"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "g words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wo"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streamin"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "rds durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words "
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming wor"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable stre"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable strea"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "aming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable s"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "treaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable s"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": " words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durab"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words d"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "le streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable strea"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durab"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "ming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words d"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable s"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "urable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable st"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": " words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable st"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durabl"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "reaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable st"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable st"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "reaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words du"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable st"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "rable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable st"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming word"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "reaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words du"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words dur"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "rable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words du"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words dur"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "rable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durabl"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streami"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "e streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "inbox",
+   "items": []
+  },
+  {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable str"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": " durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streami"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
+   "type": "view",
+   "view": {
+    "generation": {
+     "attempt": 1,
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words"
+       }
+      ],
+      "api": "faux:1793938724956:55ehi7z084t",
+      "provider": "faux",
+      "model": "echo",
+      "usage": {
        "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "ng words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable"
-      }
-     ]
+       "output": 959,
+       "cacheRead": 2794,
+       "cacheWrite": 254,
+       "totalTokens": 4007,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793938726677
+     }
     }
-   ]
+   }
   },
   {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
-       "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": " streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable str"
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
-       "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": "eaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable"
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_update",
-     "usage": {
-      "input": 254,
-      "output": 959,
-      "cacheRead": 1560,
-      "cacheWrite": 255,
-      "totalTokens": 3028,
-      "cost": {
-       "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "total": 0
-      }
-     },
-     "changes": [
-      {
-       "type": "text_delta",
-       "contentIndex": 0,
-       "delta": " streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streami"
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "type": "batch",
-   "events": [
-    {
-     "type": "message_end",
-     "entry": {
+   "type": "view",
+   "view": {
+    "entries": [
+     {
       "model": [
        {
         "role": "assistant",
@@ -1725,15 +1517,15 @@
           "text": "durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming wordsdurable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words durable streaming words"
          }
         ],
-        "api": "faux:1791233652653:gko713ni36",
+        "api": "faux:1793938724956:55ehi7z084t",
         "provider": "faux",
         "model": "echo",
         "usage": {
-         "input": 254,
+         "input": 0,
          "output": 959,
-         "cacheRead": 1560,
-         "cacheWrite": 255,
-         "totalTokens": 3028,
+         "cacheRead": 2794,
+         "cacheWrite": 254,
+         "totalTokens": 4007,
          "cost": {
           "input": 0,
           "output": 0,
@@ -1743,7 +1535,9 @@
          }
         },
         "stopReason": "stop",
-        "timestamp": 1791233654244
+        "timestamp": 1793938726677,
+        "durationMs": 2543,
+        "thinkingLevel": "low"
        }
       ],
       "kind": "pi.assistant",
@@ -1751,51 +1545,33 @@
       "conversationId": 1,
       "byTaskId": 20
      }
-    },
-    {
-     "type": "turn_end"
-    },
-    {
-     "type": "run_end",
-     "inputs": [
-      19
-     ]
-    },
-    {
-     "type": "submission",
-     "record": {
-      "conversationId": 1,
-      "requestId": "s-slow",
-      "type": "input",
-      "status": "done",
-      "entry": 18,
-      "id": 19,
-      "answer": 21
-     }
-    },
-    {
-     "type": "usage_changed",
-     "usage": {
-      "models": {
-       "faux/echo": {
-        "input": 1814,
-        "output": 987,
-        "cacheRead": 3088,
-        "cacheWrite": 1815,
-        "totalTokens": 7704,
-        "cost": {
-         "input": 0,
-         "output": 0,
-         "cacheRead": 0,
-         "cacheWrite": 0,
-         "total": 0
-        }
+    ],
+    "run": null,
+    "generation": null,
+    "usage": {
+     "models": {
+      "faux/echo": {
+       "input": 0,
+       "output": 987,
+       "cacheRead": 5557,
+       "cacheWrite": 3048,
+       "totalTokens": 9592,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
        }
-      },
-      "tools": {}
-     }
+      }
+     },
+     "tools": {}
     }
-   ]
+   }
+  },
+  {
+   "type": "inbox",
+   "items": []
   }
  ],
  "transcript": [
@@ -1816,7 +1592,7 @@
     {
      "type": "tool",
      "call": {
-      "callId": "tool:1791233652813:p6ykju3sndd",
+      "callId": "tool:1793938725156:p5s1el0txqs",
       "name": "bash",
       "args": {
        "command": "for i in 1 2 3; do echo line$i; sleep 0.4; done"

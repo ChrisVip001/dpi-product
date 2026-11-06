@@ -54,23 +54,17 @@ test("a streamed turn: snapshot, deltas, tool output, results and dedupe", () =>
   assert.deepEqual(model.state.items.map((i) => i.kind), ["user"]);
 
   model.apply({
-    type: "batch",
-    events: [
-      { type: "run_start", inputs: [1] },
-      { type: "message_start", message: assistant([]) },
-      {
-        type: "message_update",
-        usage,
-        changes: [
-          { type: "text_start", contentIndex: 0, block: { type: "text", text: "" } },
-          { type: "text_delta", contentIndex: 0, delta: "Let me " },
-          { type: "text_delta", contentIndex: 0, delta: "look." },
-          { type: "toolcall_start", contentIndex: 1, block: { type: "toolCall", id: "c1", name: "bash", arguments: {} } },
-          { type: "toolcall_delta", contentIndex: 1, path: ["arguments", "command"], delta: "ls" },
-          { type: "toolcall_delta", contentIndex: 1, path: ["arguments", "command"], delta: " -la" },
-        ],
+    type: "view",
+    view: {
+      run: { inputs: [1] },
+      generation: {
+        attempt: 1,
+        message: assistant([
+          { type: "text", text: "Let me look." },
+          { type: "toolCall", id: "c1", name: "bash", arguments: { command: "ls -la" } },
+        ]),
       },
-    ],
+    },
   });
   let live = model.state.items.at(-1)!;
   assert.equal(live.kind, "assistant");
@@ -87,38 +81,36 @@ test("a streamed turn: snapshot, deltas, tool output, results and dedupe", () =>
     model: [assistant([{ type: "text", text: "Let me look." }, { type: "toolCall", id: "c1", name: "bash", arguments: { command: "ls -la" } }])],
   };
   model.apply({
-    type: "batch",
-    events: [
-      { type: "message_end", entry: finalAssistant },
-      { type: "entry_appended", entry: finalAssistant }, // duplicate delivery must not duplicate the item
-      { type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "ls -la" } },
-      { type: "tool_execution_update", toolCallId: "c1", toolName: "bash", output: { append: "a\nb\n" } },
-      { type: "tool_execution_update", toolCallId: "c1", toolName: "bash", output: { trimStart: 2, append: "c\n" } },
-    ],
+    type: "view",
+    view: {
+      // The same entry twice must not duplicate the item.
+      entries: [finalAssistant, finalAssistant],
+      tools: [{ callId: "c1", name: "bash", status: "running", output: "a\nb\nc\n" }],
+      generation: null,
+    },
   });
   assert.equal(model.state.items.filter((i) => i.kind === "assistant").length, 1);
   const running = model.state.items[1];
   const runningCall = running.kind === "assistant" && running.blocks[1].type === "tool" ? running.blocks[1].call : undefined;
   assert.equal(runningCall?.status, "running");
-  assert.equal(runningCall?.output, "b\nc\n");
+  // 1.5 views carry the whole retained output, not append/trim deltas.
+  assert.equal(runningCall?.output, "a\nb\nc\n");
 
   model.apply({
-    type: "batch",
-    events: [
-      {
-        type: "tool_execution_end",
-        toolCallId: "c1",
-        toolName: "bash",
-        entry: {
+    type: "view",
+    view: {
+      entries: [
+        {
           id: 3,
           conversationId: 1,
           kind: "pi.tool-result",
           model: [{ role: "toolResult", toolCallId: "c1", toolName: "bash", content: [{ type: "text", text: "a\nb\nc\n" }], isError: false }],
         },
-      },
-      { type: "message_end", entry: { id: 4, conversationId: 1, kind: "pi.assistant", model: [assistant([{ type: "text", text: "Done." }])] } },
-      { type: "run_end", inputs: [1] },
-    ],
+        { id: 4, conversationId: 1, kind: "pi.assistant", model: [assistant([{ type: "text", text: "Done." }])] },
+      ],
+      tools: [],
+      run: null,
+    },
   });
   const kinds = model.state.items.map((i) => i.kind);
   assert.deepEqual(kinds, ["user", "assistant", "assistant"]);
@@ -132,10 +124,10 @@ test("a streamed turn: snapshot, deltas, tool output, results and dedupe", () =>
   assert.match(toMarkdown(model.state.items), /### You \(#1\)\n\nhi/);
 });
 
-test("overflow snapshot inside a batch replaces state; inbox and docs frames apply", () => {
+test("a fresh snapshot replaces state; inbox and docs frames apply", () => {
   const model = new AgentModel();
   model.apply({ type: "snapshot", snapshot: snapshot([user(1, "a"), user(2, "b")]), inbox: [] });
-  model.apply({ type: "batch", events: [snapshot([user(9, "fresh")], { run: { inputs: [9] } })] });
+  model.apply({ type: "snapshot", snapshot: snapshot([user(9, "fresh")], { run: { inputs: [9] } }), inbox: [] });
   assert.deepEqual(model.state.items.map((i) => i.kind === "user" && i.text), ["fresh"]);
   assert.equal(model.state.running, true);
   model.apply({ type: "inbox", items: [{ id: 7, mode: "steer", content: "use pnpm" }] });
@@ -147,14 +139,14 @@ test("overflow snapshot inside a batch replaces state; inbox and docs frames app
 test("reset entry drops the old context; aborted partials and unmatched results render", () => {
   const model = new AgentModel();
   model.apply({ type: "snapshot", snapshot: snapshot([user(1, "old"), user(2, "older")]), inbox: [] });
-  model.apply({ type: "batch", events: [{ type: "entry_appended", entry: { id: 5, conversationId: 1, kind: "pi.reset", head: 5 } }] });
+  model.apply({ type: "view", view: { entries: [{ id: 5, conversationId: 1, kind: "pi.reset", head: 5 }] } });
   assert.deepEqual(model.state.items.map((i) => i.kind), ["event"]);
-  // pi-durable delivers a reset with a handoff note as message_end, not entry_appended.
+  // A reset with a handoff note arrives as a committed entry, like any other.
   const viaMessage = new AgentModel();
   viaMessage.apply({ type: "snapshot", snapshot: snapshot([user(1, "old")]), inbox: [] });
   viaMessage.apply({
-    type: "batch",
-    events: [{ type: "message_end", entry: { id: 7, conversationId: 1, kind: "pi.reset", head: 7, model: [{ role: "user", content: "note" }] } }],
+    type: "view",
+    view: { entries: [{ id: 7, conversationId: 1, kind: "pi.reset", head: 7, model: [{ role: "user", content: "note" }] }] },
   });
   assert.deepEqual(viaMessage.state.entries.map((e) => e.id), [7]);
 
@@ -202,7 +194,7 @@ test("session lineage and network tree nest forks and subagents", () => {
   assert.equal(networkTree([{ ...device, status: "offline" }])[0].stale, true);
 });
 
-test("a recorded real stream (backend + pi-durable watchEvents) reduces to the server's transcript", async () => {
+test("a recorded real stream (backend + pi-durable 1.5 views) reduces to the server's transcript", async () => {
   const { readFileSync } = await import("node:fs");
   const fixture = JSON.parse(readFileSync(new URL("./fixtures/agent-tool-turn.json", import.meta.url), "utf8"));
   const model = new AgentModel();
