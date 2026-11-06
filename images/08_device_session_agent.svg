@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 652" width="1200" height="652" role="img" aria-labelledby="title desc" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="title">Device, session, agent</title>
-  <desc id="desc">A device runs one dpi-backend, each session on it has one harness and one agent.sqlite, and each agent is Main, a fork or a subagent; the command just tui attach mac-mini:api-refactor:fork names one agent by device, session and agent.</desc>
+  <desc id="desc">A device runs one backend, each session on it has one harness and one agent.sqlite, and each agent is Main, a fork or a subagent; the command just tui attach mac-mini:api-refactor:fork names one agent by device, session and agent.</desc>
   <style>
     .a { animation-duration: 13s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
     .ln { animation-timing-function: linear; }
@@ -80,7 +80,7 @@
   </defs>
   <rect width="1200" height="652" rx="18" fill="#141011"/>
   <text x="48" y="70" font-size="34" font-weight="600" fill="#F3EDEE">Device, session, agent</text>
-  <g class="a" style="animation-name: lv0"><text x="48" y="131" font-size="22" font-weight="600" fill="#B9AAAE">device:</text><text x="48" y="157" font-size="20" fill="#B9AAAE">one dpi-backend</text></g>
+  <g class="a" style="animation-name: lv0"><text x="48" y="131" font-size="22" font-weight="600" fill="#B9AAAE">device:</text><text x="48" y="157" font-size="20" fill="#B9AAAE">one backend</text></g>
   <g class="a" style="animation-name: lv1"><text x="48" y="261" font-size="22" font-weight="600" fill="#B9AAAE">session:</text><text x="48" y="287" font-size="20" fill="#B9AAAE">one harness, one agent.sqlite</text></g>
   <g class="a" style="animation-name: lv2"><text x="48" y="414" font-size="22" font-weight="600" fill="#B9AAAE">agent:</text><text x="48" y="440" font-size="20" fill="#B9AAAE">Main, a fork or a subagent</text></g>
   <rect class="a" style="animation-name: fork_hl" x="477" y="436" width="150" height="76" rx="12" fill="#21191B" stroke="#FF5252" stroke-width="2.5"/>

@@ -1,8 +1,8 @@
-# dpi-tui, the terminal client. Targets look like <device>[:<session>[:<agent>]].
+# tui, the terminal client. Targets look like <device>[:<session>[:<agent>]].
 
 set shell := ["zsh", "-cu"]
 set positional-arguments
-set working-directory := "../../apps/dpi-tui"
+set working-directory := "../../apps/tui"
 
 # List terminal client commands
 [default]

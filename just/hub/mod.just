@@ -2,7 +2,7 @@
 
 set shell := ["zsh", "-cu"]
 set positional-arguments
-set working-directory := "../../apps/dpi-playground"
+set working-directory := "../../apps/hub"
 
 port := env("DPI_HUB_PORT", "4781")
 free-port := source_directory() / ".." / "free-port.sh"

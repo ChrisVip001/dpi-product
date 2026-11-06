@@ -3,7 +3,7 @@
 
 set shell := ["zsh", "-cu"]
 set positional-arguments
-set working-directory := "../../apps/dpi-sdk"
+set working-directory := "../../apps/sdk"
 
 net := "NODE_NO_WARNINGS=1 npx tsx scripts/net.ts"
 

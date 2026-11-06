@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img" aria-labelledby="title desc" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="title">SQLite on every device</title>
-  <desc id="desc">Every device runs dpi-backend with its own SQLite files: a catalog, shared app state and one agent.sqlite per session, while the hub keeps only a network.sqlite of device URLs and tokens.</desc>
+  <desc id="desc">Every device runs backend with its own SQLite files: a catalog, shared app state and one agent.sqlite per session, while the hub keeps only a network.sqlite of device URLs and tokens.</desc>
   <defs>
     <symbol id="g-pi" viewBox="0 0 64 64">
       <rect x="1.5" y="1.5" width="61" height="61" rx="12" fill="#141011" stroke="#FF5252" stroke-width="2.5"/>
@@ -86,11 +86,11 @@
   <text x="48" y="70" font-size="34" font-weight="600" fill="#F3EDEE">SQLite on every device</text>
 
   <g class="loop">
-    <!-- a device: dpi-backend and its SQLite files -->
+    <!-- a device: backend and its SQLite files -->
     <g class="a dev">
       <rect x="48" y="100" width="788" height="422" rx="12" fill="#21191B" stroke="#443438" stroke-width="2"/>
       <use href="#g-server" x="80" y="122" width="64" height="44"/>
-      <text class="mono" x="162" y="152" font-size="24" fill="#F3EDEE">dpi-backend</text>
+      <text class="mono" x="162" y="152" font-size="24" fill="#F3EDEE">backend</text>
       <text x="340" y="152" font-size="20" fill="#B9AAAE">on every device</text>
       <path d="M428 192 V498" stroke="#443438" stroke-width="2"/>
     </g>

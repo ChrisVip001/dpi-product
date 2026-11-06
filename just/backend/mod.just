@@ -1,8 +1,8 @@
-# dpi-backend on this machine. Remote devices run it as a service (see `just net`).
+# backend on this machine. Remote devices run it as a service (see `just net`).
 
 set shell := ["zsh", "-cu"]
 set positional-arguments
-set working-directory := "../../apps/dpi-backend"
+set working-directory := "../../apps/backend"
 
 free-port := source_directory() / ".." / "free-port.sh"
 # The port the backend will bind: $DPI_PORT, else DPI_PORT in ~/.dpi/backend.env, else 4780.

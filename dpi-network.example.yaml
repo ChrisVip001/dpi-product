@@ -2,7 +2,7 @@
 #
 #   cp dpi-network.example.yaml dpi-network.yaml
 #
-# Every device runs apps/dpi-backend. Clients (the web hub, dpi-tui, curl) connect with a URL and a
+# Every device runs apps/backend. Clients (the web hub, tui, curl) connect with a URL and a
 # bearer token. No code or recipe names a machine: `just net <verb> <id>` looks the id up here and
 # runs the driver for its `kind`.
 #
@@ -30,9 +30,9 @@
 #   <NAME>=<value>   for each entry in env (defaults.env merged with the device's env)
 
 defaults:
-  port: 4780                       # dpi-backend port on every device
+  port: 4780                       # backend port on every device
   node: 24                         # Node major installed with nvm on ssh / exe-dev devices
-  code_dir: ~/dpi                  # where apps/dpi-backend + apps/dpi-sdk are synced (ssh / exe-dev)
+  code_dir: ~/dpi                  # where apps/backend + apps/sdk are synced (ssh / exe-dev)
   home_dir: ~/.dpi                 # backend.env, data and logs; deploys never touch it
   start_dirs: ["~/dpi-work"]       # where new sessions start (created if missing); any existing folder works as a cwd
   env_keys: [DEEPSEEK_API_KEY]     # secrets: copied by name from .env, never written here
