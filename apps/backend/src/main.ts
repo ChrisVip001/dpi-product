@@ -1,4 +1,4 @@
-// backend: one device of the Durable Agent Network.
+// backend: one device of a DPI network.
 import express from "express";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
@@ -6,6 +6,7 @@ import { loadConfig } from "./config.js";
 import { Store } from "./store.js";
 import { bearerAuth } from "./auth.js";
 import { errorMiddleware } from "./errors.js";
+import { hooksRouter, keepRawBody, loadHooks } from "./hooks.js";
 import { v1 } from "./routes.js";
 
 const config = loadConfig();
@@ -16,9 +17,13 @@ const store = await Store.open({
   provider: config.provider,
 });
 
+const hooks = loadHooks(config.hooksFile);
+
 const app = express();
 app.disable("x-powered-by");
 app.get("/healthz", (_req, res) => res.json({ ok: true }));
+// Hooks authenticate with their own secret instead of the device token, so they mount before the token gate.
+app.use("/v1/hooks", express.json({ limit: "256kb", verify: keepRawBody }), hooksRouter(store, hooks));
 app.use("/v1", bearerAuth(config.token), express.json({ limit: "256kb" }), v1(store));
 app.use((_req, res) => res.status(404).json({ error: { code: "not_found", message: "Route not found" } }));
 app.use(errorMiddleware);
@@ -28,6 +33,8 @@ server.keepAliveTimeout = 65_000;
 server.listen(config.port, config.host, () => {
   console.log(`backend "${config.name}" (uid ${store.uid}) on http://${config.host}:${config.port}`);
   console.log(`data: ${config.dataDir}  start dirs: ${config.startDirs.join(", ")}  provider: ${config.provider}`);
+  if (Object.keys(hooks).length)
+    console.log(`hooks: ${Object.keys(hooks).join(", ")}  (${config.hooksFile})`);
   if (config.host === "0.0.0.0")
     for (const addresses of Object.values(networkInterfaces()))
       for (const a of addresses ?? [])

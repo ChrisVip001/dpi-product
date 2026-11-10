@@ -1,0 +1,10 @@
+{
+  "feishu-work": {
+    "secret": "replace-with-at-least-32-random-characters",
+    "session": "work",
+    "agent": "main",
+    "prompt": "来自飞书群 {{chat}}（{{user}}）的需求：\n{{text}}\n\n如果需求不完整，先在群里问清楚再动手。",
+    "whenBusy": "followUp",
+    "limit": 20
+  }
+}

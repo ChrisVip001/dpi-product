@@ -11,6 +11,8 @@ export interface BackendConfig {
   port: number;
   home: string;
   envFile: string;
+  /** Signed inbound triggers for bridges: `~/.dpi/hooks.json` unless `$DPI_HOOKS_FILE` says otherwise. */
+  hooksFile: string;
   dataDir: string;
   startDirs: string[];
   provider: "openrouter" | "deepseek" | "faux";
@@ -46,6 +48,7 @@ export function loadConfig(argv = process.argv.slice(2), env = process.env): Bac
     port: Number(flag("--port", env.DPI_PORT ?? "4780")),
     home,
     envFile,
+    hooksFile: resolve(expand(flag("--hooks-file", env.DPI_HOOKS_FILE ?? join(home, "hooks.json")))),
     dataDir: resolve(expand(flag("--data-dir", env.DPI_DATA_DIR ?? join(home, "backend")))),
     startDirs: flag("--start-dirs", env.DPI_START_DIRS ?? "~/dpi-work")
       .split(":")
