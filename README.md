@@ -126,6 +126,23 @@ The hub remembers a language picked in the top bar in its own `ui_state`, so it 
 A missing or empty translation falls back to English rather than blanking a screen, and `just check` fails
 if the two catalogs stop carrying the same keys.
 
+## Runtime switches
+
+The device does two things to every tool call and to the model request, and four switches decide the rest. All are read
+from the backend's environment (`~/.dpi/backend.env`), and all roll back by unsetting them:
+
+| Variable | Default | What it changes |
+| --- | --- | --- |
+| `DPI_TOOL_AUDIT` | on | `off` returns tool results exactly as the tools wrote them, with no masking, clipping or per-call record |
+| `DPI_TOOL_OUTPUT_MAX_CHARS` | 20000 | how much of one result the model may read before the rest is clipped |
+| `DPI_MODEL_FALLBACK` | unset | `from>to`, such as `deepseek-chat>deepseek-reasoner`: a rewritten `model` field when the primary fails |
+| `DPI_MAX_OUTPUT_TOKENS` | unset | a cap on the output tokens of one answer |
+| `DPI_DEFERRED_TOOLS` | off | `on` keeps eight rarely used tools out of every request until `tool_search` loads them (≈1,160 fewer resident tokens, measured on this device's catalogue) |
+| `DPI_CODEMODE` | off | `on` adds the `codemode` tool: one script that calls the session's tools, replayed rather than repeated after a crash |
+
+Deferral and code mode are off by default because both change what the model sees: a prompt that names a tool assumes
+the tool is offered, and code mode adds a sandbox and a wide-reaching tool.
+
 Runtime data lives in `~/.dpi` by default. To keep an existing 1.0.3 device untouched, point a second instance elsewhere:
 
 ```bash

@@ -77,6 +77,8 @@ export function v1(store: Store) {
   r.patch("/sessions/:s/compaction", route(async (req, res) => res.json(store.setCompaction(L(res).row, req.body ?? {}))));
   r.delete("/sessions/:s", route(async (_req, res) => res.json(await store.archive(L(res).row))));
   r.get("/sessions/:s/events", route(async (_req, res) => sessionStream(store, L(res).row, res)));
+  // Device health for the runtime panel: counters, task states and durations, recent failures.
+  r.get("/runtime", route(async (_req, res) => res.json(await store.runtime())));
   r.get(
     "/sessions/:s/tasks",
     route(async (req, res) => {

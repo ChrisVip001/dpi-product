@@ -22,8 +22,11 @@ export type ErrorCode =
   | "not_found"
   | "invalid"
   | "busy"
+  | "idle"
+  | "read_only"
   | "conflict"
   | "ambiguous"
+  | "session_failed"
   | "unavailable"
   | "internal"
   | "offline";
@@ -400,10 +403,29 @@ export type WireMessageChange =
   | { type: "block"; contentIndex: number; block: WireAssistantBlock }
   | { type: "message"; message: WireAssistantMessage };
 
+/** Why the newest run ended without an answer, so the UI can say it instead of showing a run that stopped. */
+export interface WireRunFailure {
+  taskId: number;
+  inputs: readonly number[];
+  reason:
+    | "model_error"
+    | "no_model"
+    | "aborted"
+    | "reset"
+    | "faulted"
+    | "orphaned"
+    | "interrupted"
+    | "restart_limit"
+    | "nothing_to_answer"
+    | "turn_limit";
+  detail?: string;
+}
+
 export interface WireSnapshotEvent {
   type: "snapshot";
   entries: readonly WireEntry[];
   run?: { inputs: readonly number[] };
+  failure?: WireRunFailure;
   generation?: {
     attempt: number;
     message?: WireAssistantMessage;
@@ -426,12 +448,50 @@ export interface WireViewUpdate {
   reset?: boolean;
   entries?: readonly WireEntry[];
   run?: { inputs: readonly number[] } | null;
+  failure?: WireRunFailure | null;
   generation?: WireSnapshotEvent["generation"] | null;
   tools?: readonly WireToolSlot[];
   compactions?: readonly WireCompaction[];
   inbox?: readonly WireQueued[];
   agent?: WireAgentState;
   usage?: WireUsageState;
+}
+
+/** Histogram summary: how many samples, their total, and the worst one. */
+export interface WireHistogram {
+  count: number;
+  total: number;
+  max: number;
+}
+
+/** One session's part of the device's runtime picture. */
+export interface WireRuntimeSession {
+  id: string;
+  /** Live tasks by inspection state, such as `running`, `sleeping`, `waiting`. */
+  byState: Record<string, number>;
+  /** Durations of tasks that finished in this process. */
+  durations: { count: number; avgMs: number; maxMs: number };
+  /** Why the session failed last, when it did. */
+  error?: string;
+}
+
+/**
+ * What the device can say about its own health: counters and durations (tools, model requests, restarts), the sessions
+ * holding tasks right now, and the failure reports the runtime wrote. The dashboard reads this; nothing here is needed
+ * to run a session.
+ */
+export interface WireRuntime {
+  at: number;
+  uptimeMs: number;
+  storageFailed: boolean;
+  counters: Record<string, number>;
+  histograms: Record<string, WireHistogram>;
+  /** Reports by kind, such as `task_faulted` or `task_interrupted`. */
+  byKind: Record<string, number>;
+  /** Restarts the runtime counted while recovering tasks. */
+  restarts: number;
+  reports: { at: number; kind: string; message: string; reason?: string; restarts?: number }[];
+  sessions: WireRuntimeSession[];
 }
 
 /** A queued submission with its content, read from the conversation's `pi.inbox` document. */

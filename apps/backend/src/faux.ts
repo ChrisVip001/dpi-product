@@ -6,10 +6,13 @@
 //   "job: <id>[ <input json>][ wait]" → one run_durable_job call (wait: the call waits for the run)
 //   "check:[ <task id>|<job id>]" → one check_durable_job call
 //   "search: <words>" → one search_history call
+//   "gather: <tool>[,<tool>]" → one gather call nesting those read-only tools
+//   "code: <script>" → one codemode call running the script
 //   "page: <summary>" → one ping_on_call_engineer call
 //   "Release check: …" (the release-check job's subagent) → one bash call
 //   anything else  → "Echo: <text>"
 import type { MutableModels } from "@earendil-works/pi-ai/models";
+import type { JsonObject } from "@earendil-works/pi-durable";
 import {
   fauxAssistantMessage,
   fauxProvider,
@@ -68,6 +71,18 @@ export function installFaux(models: MutableModels) {
       return call("check_durable_job", /^\d+$/.test(ref) ? { task_id: Number(ref) } : ref ? { job: ref } : {});
     }
     if (prompt.startsWith("search:")) return call("search_history", { query: prompt.slice(7).trim() });
+    // "gather: read_state,search_history" → one nested batch of read-only calls.
+    if (prompt.startsWith("gather:")) {
+      const calls = prompt
+        .slice(7)
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .map((tool) => ({ tool, args: (tool === "search_history" ? { query: "gather" } : {}) as JsonObject }));
+      return call("gather", { calls: calls as unknown as JsonObject });
+    }
+    // "code: return 1 + 1" → one code-mode call running the script.
+    if (prompt.startsWith("code:")) return call("codemode", { code: prompt.slice(5).trim() });
     if (prompt.startsWith("page:")) return call("ping_on_call_engineer", { summary: prompt.slice(5).trim() });
     if (prompt.startsWith("Release check:"))
       return call("bash", { command: "git log --oneline -5 2>/dev/null || echo 'no git history'; ls | head -5" });

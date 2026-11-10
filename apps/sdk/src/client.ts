@@ -18,6 +18,7 @@ import type {
   TaskOutcome,
   WhenBusy,
   WireEntry,
+  WireRuntime,
 } from "./api.js";
 import { DpiError } from "./errors.js";
 import { readSse } from "./sse.js";
@@ -127,6 +128,10 @@ export class DpiClient {
   }
   tree() {
     return this.request<DeviceTree>("GET", "/v1/tree");
+  }
+  /** Counters, task states and durations, and recent failures, for the runtime panel. */
+  runtime() {
+    return this.request<WireRuntime>("GET", "/v1/runtime");
   }
   dirs(path = "") {
     return this.request<DirListing>("GET", `/v1/fs/dirs?path=${enc(path)}`);

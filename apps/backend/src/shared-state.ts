@@ -1,4 +1,5 @@
-import { Harness, createRegistry, defineDoc, defineDocFamily } from "@earendil-works/pi-durable";
+import { Harness, createRegistry, defineDoc, defineDocFamily, type Report } from "@earendil-works/pi-durable";
+import type { RuntimeTelemetry } from "./telemetry.js";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
@@ -34,11 +35,17 @@ const Receipts = defineDocFamily<{ applied: boolean; result: string }, null>({
 
 export class SharedState {
   private constructor(readonly harness: Harness) {}
-  static async open(path: string) {
+  /** `telemetry` is the device's sink, shared so App State failures land in the same report stream as sessions. */
+  static async open(path: string, telemetry?: RuntimeTelemetry) {
+    const sink = telemetry;
     return new SharedState(
       await Harness.open(
         await openNodeSqliteStorage(path),
-        { models: createModels(), registry: createRegistry() },
+        {
+          models: createModels(),
+          registry: createRegistry(),
+          ...(sink ? { telemetry: sink, onReport: (report: Report) => sink.report(report) } : {}),
+        },
         ctx,
       ),
     );

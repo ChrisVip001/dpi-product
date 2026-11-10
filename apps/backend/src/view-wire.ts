@@ -6,6 +6,7 @@ import type {
   WireCompaction,
   WireEntry,
   WireQueued,
+  WireRunFailure,
   WireSnapshotEvent,
   WireToolSlot,
   WireViewUpdate,
@@ -48,6 +49,9 @@ export function snapshotOf(view: ConversationView): WireSnapshotEvent {
     type: "snapshot",
     entries: clone(view.entries) as unknown as WireEntry[],
     ...(live.run ? { run: { inputs: [...live.run.inputs] } } : {}),
+    // Why the last run ended without an answer (`restart_limit`, `turn_limit`, ...): a run that stops silently reads as a
+    // hang, and 1.5 records the reason rather than throwing.
+    ...(live.runFailure ? { failure: clone(live.runFailure) as unknown as WireRunFailure } : {}),
     ...(generation
       ? {
           generation: {
@@ -67,9 +71,13 @@ export function snapshotOf(view: ConversationView): WireSnapshotEvent {
 }
 
 /**
- * Turns successive views into either a fresh snapshot (window slid, or first frame) or the smallest
- * `view` update that still lets the client render. Entries are append-only; everything else is compared
- * by value.
+ * Turns successive views into a snapshot on attach and `view` updates afterwards: entries append, everything else is
+ * compared by value.
+ *
+ * It never sends a second snapshot. The device's window slides — the watch keeps the newest N entries — so the frame that
+ * used to be a full snapshot is now only the entries the client has not seen. The client keeps its own transcript, which
+ * is what makes history longer than the window readable: a whole-window resend every time the window slid made the
+ * browser drop everything it had, so a 400-entry conversation showed the last 200 after a long run.
  */
 export class ViewDiffer {
   private ids = new Set<number>();
@@ -79,15 +87,18 @@ export class ViewDiffer {
   next(view: ConversationView): { full: WireSnapshotEvent } | { update: WireViewUpdate } | undefined {
     const snapshot = snapshotOf(view);
     const fresh = snapshot.entries.filter((entry) => !this.ids.has(entry.id));
-    const slid =
-      this.started && this.ids.size > 0 && fresh.length === snapshot.entries.length && snapshot.entries.length > 0;
 
-    if (!this.started || slid) {
+    if (!this.started) {
       this.started = true;
       this.ids = new Set(snapshot.entries.map((entry) => entry.id));
       this.last.clear();
       return { full: snapshot };
     }
+
+    // Entries are append-only and the window only ever covers the newest ones, so an id that left it never comes back:
+    // forgetting it keeps `ids` the size of the window while the client keeps the full transcript.
+    const window = new Set(snapshot.entries.map((entry) => entry.id));
+    for (const id of this.ids) if (!window.has(id)) this.ids.delete(id);
 
     const update: WireViewUpdate = {};
     let changed = false;
@@ -104,6 +115,7 @@ export class ViewDiffer {
       put("entries", fresh);
     }
     put("run", snapshot.run ?? null);
+    put("failure", snapshot.failure ?? null);
     put("generation", snapshot.generation ?? null);
     put("tools", snapshot.tools);
     put("compactions", snapshot.compactions);

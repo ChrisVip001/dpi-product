@@ -4,7 +4,8 @@
 // the run record and the chat card all name the same phase. A phase does real work (shell commands in the session's
 // folder, a subagent with read and bash, App State writes), records every step in the conversation document
 // `demo.job-runs`, then commits the next checkpoint. A restart resumes the unfinished phase from its checkpoint.
-import type { Context, JsonValue } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
+import type { JsonValue } from "@earendil-works/chord/json";
 import {
   configure,
   defineDoc,
@@ -55,6 +56,8 @@ type Running = RunningTask<JobInput, Checkpoint, JobResult>;
 
 /** Pause before each phase so a person can follow the run; durable, so a restart keeps the schedule. */
 const PACE_MS = 900;
+/** How long a pending approval sleeps between checks of the run record. */
+const APPROVAL_POLL_MS = 500;
 const MAX_RUNS = 30;
 const MAX_STEPS = 40;
 const RESULT_ROOT = "jobs";
@@ -383,20 +386,19 @@ export function createJobs(deps: JobsDeps) {
     version: 1,
     initial: () => ({ phase: "wait" }),
     phases: {
-      // Reads the run's decision every 500 ms without writing; the button click is the only write.
+      // One read per wake, no invocation held while nobody clicks: a sleeping task costs nothing, a 500 ms poll holds one.
       wait: async (task, runtime, ctx) => {
-        for (;;) {
-          const doc = await runtime.snapshot(JobRuns, task.conversationId, ctx);
-          const decision = doc?.items[String(task.input.runId)]?.approval;
-          if (decision && decision !== "pending") {
-            await runtime.commit(
-              () => ({ status: "terminal", outcome: { status: "completed", result: { approved: decision === "approved" } } }),
-              ctx,
-            );
-            return;
-          }
-          await wait(runtime, 500);
+        const doc = await runtime.snapshot(JobRuns, task.conversationId, ctx);
+        const decision = doc?.items[String(task.input.runId)]?.approval;
+        if (decision && decision !== "pending") {
+          await runtime.commit(
+            () => ({ status: "terminal", outcome: { status: "completed", result: { approved: decision === "approved" } } }),
+            ctx,
+          );
+          return;
         }
+        // Resumes this same phase when the Harness clock reaches the deadline; the call stores the sleep and returns.
+        await runtime.sleepUntil(runtime.now() + APPROVAL_POLL_MS, { phase: "wait" }, ctx);
       },
     },
     abort: async (_task, runtime, ctx) => {

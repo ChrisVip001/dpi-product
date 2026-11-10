@@ -21,6 +21,9 @@ import { toTranscript, type LiveTool, type TranscriptItem } from "./transcript.j
 
 type Listener = () => void;
 
+/** Entries a client keeps after the device's window has moved past them. */
+const MAX_ENTRIES = 2_000;
+
 class Emitter {
   private listeners = new Set<Listener>();
   subscribe(fn: Listener) {
@@ -171,6 +174,15 @@ export class AgentModel extends Emitter {
     if (entry.kind === "pi.reset" || entry.kind === "pi.compaction") {
       const head = entry.head ?? entry.id;
       for (const id of this.entries.keys()) if (id < head) this.entries.delete(id);
+    }
+    // The client now keeps history the device's window no longer covers, so it also decides when to forget: this many
+    // entries is far more than anyone scrolls through, and the device still stores the rest. Pruning in one pass with
+    // slack keeps the cost off the path of every single entry.
+    if (this.entries.size > MAX_ENTRIES + 200) {
+      const extra = [...this.entries.keys()]
+        .sort((a, b) => a - b)
+        .slice(0, this.entries.size - MAX_ENTRIES);
+      for (const id of extra) this.entries.delete(id);
     }
   }
 }

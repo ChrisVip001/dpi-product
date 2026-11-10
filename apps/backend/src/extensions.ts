@@ -1,10 +1,11 @@
 import type { SharedState } from "./shared-state.js";
-import { bool, int, map, num, obj, oneOf, opt, str, union } from "@earendil-works/pi-schema";
+import { arr, bool, int, map, num, obj, oneOf, opt, str, union } from "@earendil-works/pi-schema";
 import { isAbsolute, resolve } from "node:path";
 import { readState, type AppState } from "../../sdk/src/app-state.js";
 import type { SessionSummary, ThinkingLevel } from "../../sdk/src/api.js";
 import { THINKING_LEVELS } from "../../sdk/src/api.js";
-import type { WireEntry } from "../../sdk/src/api.js";
+import type { WireEntry, WireMessage } from "../../sdk/src/api.js";
+import { messageText } from "../../sdk/src/transcript.js";
 import { jobRunDone, type JobRun } from "../../sdk/src/jobs.js";
 import {
   defineDoc,
@@ -14,11 +15,13 @@ import {
   configure,
   AssistantEntry,
   type EntryRecord,
+  type JsonObject,
   type ToolExecutionApi,
 } from "@earendil-works/pi-durable";
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import { JobRuns, jobDef, resolveJobInput, type Jobs } from "./jobs.js";
 import { searchHistory } from "./history.js";
+import { classed, isReadName } from "./tool-meta.js";
 
 export const Workspace = defineDoc<AppState>({
   kind: "demo.workspace",
@@ -103,7 +106,100 @@ export type SpawnSession = (input: {
   prompt?: string;
 }) => Promise<{ session: SessionSummary; submissionId?: number }>;
 
-export function createPlayground(shared: SharedState, sessionId: string, spawn: SpawnSession, jobs: Jobs) {
+/**
+ * One run's structured result, the shape programs get from `run_durable_job` and `check_durable_job` without parsing the
+ * text meant for the model. Same fields as the run record, plus a `missing` status for a run with no record.
+ */
+const JOB_RUN_SHAPE = {
+  type: "object",
+  properties: {
+    taskId: { type: "number", description: "The run's durable task id." },
+    job: { type: "string", description: "The job id." },
+    status: {
+      type: "string",
+      enum: ["pending", "running", "waiting", "completed", "failed", "aborted", "declined", "missing"],
+    },
+    run: { type: ["number", "null"], description: "The nth run of this job in this conversation." },
+    phase: { type: ["string", "null"], description: "The phase the run is in, or ended in." },
+    approval: { type: ["string", "null"], description: "pending, approved, declined or cancelled." },
+    result: { type: ["string", "null"], description: "The run's saved result, when it completed." },
+    error: { type: ["string", "null"], description: "Why the run failed, when it did." },
+  },
+  required: ["taskId", "job", "status"],
+  additionalProperties: false,
+} as const;
+
+const JOB_RESULT_SCHEMA = JOB_RUN_SHAPE;
+/** `check_durable_job` answers with the runs it matched: one for a task id or a job, all of them for a bare list. */
+const JOB_RUNS_SCHEMA = {
+  type: "object",
+  properties: { runs: { type: "array", items: JOB_RUN_SHAPE } },
+  required: ["runs"],
+  additionalProperties: false,
+} as const;
+
+/** What `subagent` hands to programs: the child conversation, how its turn ended, and its answer text. */
+const SUBAGENT_RESULT_SCHEMA = {
+  type: "object",
+  properties: {
+    conversationId: { type: "number", description: "The child conversation that did the work." },
+    status: { type: "string", description: "How the child's turn ended: done, failed, aborted or interrupted." },
+    answer: { type: ["string", "null"], description: "The child's final answer, as text." },
+  },
+  required: ["conversationId", "status"],
+  additionalProperties: false,
+} as const;
+
+const jobStructured = (run: JobRun) => ({
+  taskId: run.id,
+  job: run.job,
+  status: run.status,
+  run: run.run,
+  phase: run.phase ?? null,
+  approval: run.approval ?? null,
+  result: run.result ?? null,
+  error: run.error ?? null,
+});
+
+/** A JSON value, for the nested results `gather` passes on without interpreting them. */
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
+/** What `gather` hands to programs: one entry per nested call, in the order asked. */
+const GATHER_RESULT_SCHEMA = {
+  type: "object",
+  properties: {
+    results: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          tool: { type: "string" },
+          ok: { type: "boolean" },
+          value: {},
+          diagnostics: { type: "array", items: { type: "string" } },
+        },
+        required: ["tool", "ok"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["results"],
+  additionalProperties: false,
+} as const;
+
+/** A light subtask: several read-only calls in one step, no child conversation, no new context. */
+const MAX_GATHER_CALLS = 8;
+
+/** `deferred` when the device keeps rare tools behind `tool_search`; empty otherwise, so the tool is always offered. */
+const deferredWhen = (on: boolean | undefined) => (on ? ({ deferred: true } as const) : {});
+
+export function createPlayground(
+  shared: SharedState,
+  sessionId: string,
+  spawn: SpawnSession,
+  jobs: Jobs,
+  options: { deferred?: boolean } = {},
+) {
   const readAppState = defineTool({
     name: "read_state",
     description:
@@ -164,6 +260,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       "List the durable jobs you can start with run_durable_job: each job's id, what it does, its named phases, the inputs it takes (type, default, limits), whether it waits for a person's approval, the App State path where every run saves its result, and its recent runs in this conversation with their task ids for check_durable_job.",
     parameters: obj({}),
     replay: "safe",
+    ...deferredWhen(options.deferred),
     execute: async (_args, api, ctx) => {
       const runs = await recentRuns(api, ctx);
       return {
@@ -212,6 +309,8 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       ),
     }),
     replay: "safe",
+    structuredOutputSchema: JOB_RESULT_SCHEMA,
+    ...deferredWhen(options.deferred),
     execute: async (args, api, ctx) => {
       const def = jobDef(args.job);
       if (!def) throw Error(`Unknown job ${args.job}. Jobs: ${jobs.defs.map((d) => d.id).join(", ")}`);
@@ -244,6 +343,9 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
               text: `Started ${def.title} run #${run?.run ?? "?"} as durable task #${taskId}. It runs in the background, shows live in the chat and saves its result to App State ${def.resultPath}. Check it with check_durable_job {"task_id":${taskId}}.`,
             },
           ],
+          structuredOutput: run
+            ? jobStructured(run)
+            : { taskId, job: def.id, status: "pending", run: null, phase: null, approval: null, result: null, error: null },
           details: { taskId, job: def.id },
         };
       }
@@ -269,6 +371,9 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
               : `${def.title} task #${taskId} has no record.`,
           },
         ],
+        structuredOutput: run
+          ? jobStructured(run)
+          : { taskId, job: def.id, status: "missing", run: null, phase: null, approval: null, result: null, error: null },
         isError: !ok,
         details: { taskId, job: def.id },
       };
@@ -283,6 +388,8 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       job: opt(str({ description: "A job id: check its latest run." })),
     }),
     replay: "safe",
+    structuredOutputSchema: JOB_RUNS_SCHEMA,
+    ...deferredWhen(options.deferred),
     execute: async (args, api, ctx) => {
       const runs = await recentRuns(api, ctx);
       const run =
@@ -301,12 +408,16 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
               ),
             },
           ],
+          structuredOutput: { runs: runs.slice(0, 10).map(jobStructured) },
         };
       if (!run)
         throw Error(
           `No run ${args.task_id !== undefined ? `with task id ${args.task_id}` : `of ${args.job}`} in this conversation. Runs: ${runs.map((r) => `${r.id} (${r.job} #${r.run})`).join(", ") || "none"}`,
         );
-      return { output: [{ type: "text", text: JSON.stringify(runReport(run, Date.now())) }] };
+      return {
+        output: [{ type: "text", text: JSON.stringify(runReport(run, Date.now())) }],
+        structuredOutput: { runs: [jobStructured(run)] },
+      };
     },
   });
   const searchHistoryTool = defineTool({
@@ -327,13 +438,15 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       offset: opt(int({ minimum: 0, description: "Results to skip. Default 0." })),
     }),
     replay: "safe",
+    ...deferredWhen(options.deferred),
     execute: async (args, api, ctx) => {
       const { entries, activeFrom } = await api.commit(async (tx) => {
         const all: EntryRecord[] = [];
-        let page = await tx.scanEntries({ conversationId: api.conversationId }, 500);
+        // Newest first, pinned: storage defaults entries to descending and the tool's own default order is newest.
+        let page = await tx.scanEntries({ order: "descending", conversationId: api.conversationId }, 500);
         all.push(...page.items);
         while (page.next && all.length < 10_000) {
-          page = await tx.scanEntries({ conversationId: api.conversationId }, 500, page.next);
+          page = await tx.scanEntries({ order: "descending", conversationId: api.conversationId }, 500, page.next);
           all.push(...page.items);
         }
         return { entries: all, activeFrom: (await tx.latestHeadMarker(api.conversationId))?.head as number | undefined };
@@ -346,6 +459,47 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       return { output: [{ type: "text", text: JSON.stringify(result) }] };
     },
   });
+  /**
+   * A light subtask: several read-only calls in one turn. Each is a nested call, so the model gets every result together
+   * without a child conversation, a second context, or one round trip per fact. Only read tools qualify, which keeps a
+   * batch from becoming a way to write without the caller seeing each write; `subagent` stays the channel for work that
+   * needs its own transcript.
+   */
+  const gather = defineTool({
+    name: "gather",
+    description:
+      "Run up to 8 read-only tool calls in one step and get every result together: read a few files, search history, read a named App State field. Each call is nested inside this one, so nothing is written and no child agent starts. Use it when you need several facts before answering.",
+    parameters: obj({
+      calls: arr(
+        obj({
+          tool: str({ description: "A read-only tool name, for example read, read_state or search_history." }),
+          args: opt(map(union([str(), num()]), { description: "The arguments that tool takes." })),
+        }),
+        { description: "The calls, in order.", maxItems: MAX_GATHER_CALLS },
+      ),
+    }),
+    replay: "safe",
+    structuredOutputSchema: GATHER_RESULT_SCHEMA,
+    execute: async (args, api, ctx) => {
+      const results: { tool: string; ok: boolean; value: Json; diagnostics: string[] }[] = [];
+      for (const [index, call] of args.calls.slice(0, MAX_GATHER_CALLS).entries()) {
+        if (call.tool === "gather") throw Error("gather cannot call itself");
+        if (!isReadName(call.tool))
+          throw Error(`${call.tool} is not a read-only tool, so gather will not run it. Call it yourself.`);
+        const nested = await api.executeTool(call.tool, (call.args ?? {}) as JsonObject, ctx, {
+          key: `gather-${index + 1}`,
+          progress: false,
+        });
+        results.push({
+          tool: call.tool,
+          ok: !nested.isError,
+          value: nested.structuredOutput ?? null,
+          diagnostics: nested.diagnostics.map((d) => d.message),
+        });
+      }
+      return { output: [{ type: "text", text: JSON.stringify(results) }], structuredOutput: { results } };
+    },
+  });
   // No replay policy: the default `unsafe` means a crash mid-call returns an interrupted result and never pages twice.
   const pingOnCall = defineTool({
     name: "ping_on_call_engineer",
@@ -355,6 +509,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       summary: str({ description: "What the engineer needs to know, one or two sentences." }),
       severity: opt(oneOf(["low", "high", "critical"])),
     }),
+    ...deferredWhen(options.deferred),
     execute: async (args, api, ctx) => {
       const prior = await api.snapshot(Pager, api.conversationId, ctx);
       if (prior?.paged)
@@ -389,6 +544,8 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       "Delegate a self-contained task to an owned child conversation. Parent interruption also interrupts the child.",
     parameters: obj({ task: str() }),
     replay: "safe",
+    structuredOutputSchema: SUBAGENT_RESULT_SCHEMA,
+    ...deferredWhen(options.deferred),
     execute: async (args, api, ctx) => {
       const id = await api.commit(async (tx) => {
         const found = (await tx.scanConversations({ ownerTaskId: api.taskId }, 1)).items[0];
@@ -416,6 +573,11 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
         output: [
           { type: "text", text: answer ? JSON.stringify(answer.model) : JSON.stringify(result) },
         ],
+        structuredOutput: {
+          conversationId: id,
+          status: result.status,
+          answer: answer ? ((answer.model ?? []) as unknown as WireMessage[]).map(messageText).join("").trim() || null : null,
+        },
         details: { conversationId: id },
       };
     },
@@ -437,6 +599,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
       ),
     }),
     replay: "safe",
+    ...deferredWhen(options.deferred),
     execute: async (args, api, ctx) => {
       const parent = await api.agent(ctx);
       if (!parent.model) throw Error("This agent has no model to copy");
@@ -470,6 +633,7 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
     description:
       "Start a fresh model context with a concise handoff note. Old transcript stays stored.",
     parameters: obj({ note: str() }),
+    ...deferredWhen(options.deferred),
     execute: async (args) => ({
       output: [{ type: "text", text: "Context handed off." }],
       control: { handoff: args.note },
@@ -478,17 +642,19 @@ export function createPlayground(shared: SharedState, sessionId: string, spawn: 
   return defineExtension({
     name: "playground",
     tasks: jobs.tasks,
+    // Each tool declares what it does to the machine, so read-only mode cannot miss one by forgetting to list it.
     tools: [
-      readAppState,
-      updateState,
-      listJobs,
-      runJob,
-      checkJob,
-      searchHistoryTool,
-      pingOnCall,
-      subagent,
-      startSession,
-      handoff,
+      classed(readAppState, "read"),
+      classed(updateState, "write"),
+      classed(listJobs, "read"),
+      classed(runJob, "write"),
+      classed(checkJob, "read"),
+      classed(searchHistoryTool, "read"),
+      classed(gather, "read"),
+      classed(pingOnCall, "write"),
+      classed(subagent, "write"),
+      classed(startSession, "write"),
+      classed(handoff, "write"),
     ],
     sections: [
       section(

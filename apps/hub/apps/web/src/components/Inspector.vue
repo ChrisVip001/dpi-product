@@ -17,6 +17,7 @@ import { THINKING_LEVELS, type ThinkingLevel } from "@sdk/api";
 import type { StateChange } from "@sdk/app-state";
 import StateEditor from "./StateEditor.vue";
 import TasksPanel from "./TasksPanel.vue";
+import RuntimePanel from "./RuntimePanel.vue";
 import ExtensionsPanel from "./ExtensionsPanel.vue";
 import ContextBar from "./ContextBar.vue";
 import { message } from "../client/hub";
@@ -358,7 +359,10 @@ const offeredTools = computed(() => detail.value?.tools.filter((tool) => tool.of
             @change="editState"
           />
         </template>
-        <TasksPanel v-if="ui.tab === 'tasks'" />
+        <template v-if="ui.tab === 'tasks'">
+          <RuntimePanel />
+          <TasksPanel />
+        </template>
         <ExtensionsPanel v-if="ui.tab === 'extensions'" />
         <template v-if="ui.tab === 'tools'"
           ><div class="panel-heading">

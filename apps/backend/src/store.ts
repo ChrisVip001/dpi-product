@@ -20,6 +20,8 @@ import type {
   UsageTotals,
   WhenBusy,
   WireEntry,
+  WireRuntime,
+  WireRuntimeSession,
 } from "../../sdk/src/api.js";
 import {
   compactionFits,
@@ -56,10 +58,17 @@ import {
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
+import { createToolSearchExtension } from "@earendil-works/pi-durable/tool-search";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { createPlayground, Workspace, type SpawnSession } from "./extensions.js";
 import { createJobs, JobRuns, JOB_DEFS, jobDef, resolveJobInput, type Jobs } from "./jobs.js";
+import { isReadTool } from "./tool-meta.js";
+import { createRuntimeTelemetry, type RuntimeTelemetry } from "./telemetry.js";
+import { createProviderRouting, parseRouting, type ProviderRouting } from "./provider-routing.js";
+import { createToolAudit, type ToolAudit } from "./tool-audit.js";
+import { deferral } from "./tool-presence.js";
+import type { Codemode } from "./codemode.js";
 import { ADDON_INFO, createAddons, PROMPTS, PromptChecklist, type Addons } from "./addons.js";
 import { JOB_RUNS_DOC } from "../../sdk/src/jobs.js";
 import { createRequire } from "node:module";
@@ -75,17 +84,8 @@ export const DURABLE_VERSION: string = (() => {
   }
 })();
 
-/** Tools that create, update or delete: shell, files, App State, job runs, sessions, pages and subagents. */
-export const WRITE_TOOLS = new Set([
-  "bash",
-  "write",
-  "edit",
-  "update_state",
-  "run_durable_job",
-  "ping_on_call_engineer",
-  "subagent",
-  "start_session",
-]);
+// Which tools write is decided by the tools themselves (`tool-meta.ts`), not by a list kept here: a hand-kept set had
+// already drifted (`handoff` was missing), so a read-only agent was offered a tool that changes the conversation.
 
 export type SessionRow = {
   id: string;
@@ -170,6 +170,16 @@ export class Store {
   private compactions = new Map<string, Partial<CompactionSettings> | null>();
   /** Task labels never change once known: tool names of pi.tool tasks, job titles of job runs. */
   private taskLabels = new Map<string, { label?: string; callId?: string }>();
+  /** Structured runtime reports, spans and metrics for this device. */
+  readonly telemetry: RuntimeTelemetry;
+  /** Request shaping applied to every model call; empty unless the device configures it. */
+  readonly routing: ProviderRouting;
+  /** One audit record per tool result, shared by every session this device opens. */
+  readonly audit: ToolAudit;
+  /** Whether rare tools wait behind `tool_search` instead of riding in every request. */
+  readonly deferredTools: boolean;
+  /** Code mode, created on first use and shared: one sandbox holds the wasm runtime for the whole device. */
+  private codemode?: Promise<Codemode>;
 
   get catalogPath() {
     return join(this.options.dataDir, "catalog.sqlite");
@@ -201,6 +211,16 @@ export class Store {
   }
 
   private constructor(readonly options: StoreOptions) {
+    this.telemetry = createRuntimeTelemetry(options.name);
+    this.routing = parseRouting(process.env.DPI_MODEL_FALLBACK, process.env.DPI_MAX_OUTPUT_TOKENS);
+    // `DPI_TOOL_AUDIT=off` returns the old behaviour: results as the tools wrote them, no per-call record. The default
+    // masks credentials and clips a flood, which is why it is on.
+    this.audit = createToolAudit(this.telemetry, {
+      enabled: process.env.DPI_TOOL_AUDIT !== "off",
+      maxChars: Number(process.env.DPI_TOOL_OUTPUT_MAX_CHARS) || undefined,
+    });
+    // Off by default: deferral changes the tool list every prompt reads, so an operator turns it on (see tool-presence).
+    this.deferredTools = deferral(process.env.DPI_DEFERRED_TOOLS);
     if (options.provider === "faux") installFaux(this.models);
     else {
       const curated = this.curated;
@@ -238,7 +258,7 @@ export class Store {
     await Promise.all(options.startDirs.map((dir) => mkdir(dir, { recursive: true }).catch(() => {})));
     try {
       store.unlockShared = lockFile(`${store.sharedStatePath}.lock`);
-      store.shared = await SharedState.open(store.sharedStatePath);
+      store.shared = await SharedState.open(store.sharedStatePath, store.telemetry);
       store.sharedCommits = store.shared.harness.observeCommits({
         advance: () => store.notify(),
         end: () => {},
@@ -536,10 +556,24 @@ export class Store {
       );
       const registry = createRegistry();
       registry.install(CodingTools);
+      // Per-request shaping and the counters that show it: off unless the device sets DPI_MODEL_FALLBACK / a token cap.
+      const routing = createProviderRouting(this.telemetry, this.routing);
+      registry.install(routing);
       const jobs = createJobs({ shared: this.shared, sessionId: row.id });
       const compaction = () => this.compactionOf(row.id);
-      const playground = createPlayground(this.shared, row.id, this.spawnSession, jobs);
+      const playground = createPlayground(this.shared, row.id, this.spawnSession, jobs, {
+        deferred: this.deferredTools,
+      });
       registry.install(playground);
+      // Every result passes the audit before it reaches the model: masked, clipped, counted. Not selectable: an agent
+      // turning it off would be an agent deciding what an operator may see.
+      registry.install(this.audit.extension);
+      // `tool_search` is the door to the deferred tools; without it and with deferral on, nothing loads them.
+      const search = this.deferredTools ? createToolSearchExtension() : undefined;
+      if (search) registry.install(search);
+      // Code mode, when the device asks for it: one script replaces a plan of many round trips, and it replays.
+      const code = process.env.DPI_CODEMODE === "on" ? await this.codeMode() : undefined;
+      if (code) registry.install(code.extension);
       // Custom extensions are installed but not selected: an agent turns them on in its own selection.
       const addons = createAddons({ offline: this.options.provider === "faux" });
       for (const extension of addons.list) registry.install(extension);
@@ -554,14 +588,33 @@ export class Store {
             await tx.doc(JobRuns, c.id);
           },
           settings: {
-            extensions: [CodingTools, playground],
+            extensions: [
+              CodingTools,
+              playground,
+              routing,
+              this.audit.extension,
+              ...(search ? [search] : []),
+              ...(code ? [code.extension] : []),
+            ],
             // Read at every use, so a PATCH .../compaction applies from the next request.
             get compaction() {
               return compaction();
             },
             progress: { partialIntervalMs: 100, outputIntervalMs: 100 },
           },
-          onReport: (e) => console.error("[durable]", String(e)),
+          telemetry: this.telemetry,
+          onReport: (report) => this.telemetry.report(report),
+          // The host clock, its timers and its wake signal: without them a sleeping task has nothing to wake it, so a
+          // checkpoint could only resume when the process happens to reopen the session.
+          now: () => Date.now(),
+          setTimer: (callback, delayMs) => {
+            const timer = setTimeout(callback, Math.max(0, delayMs));
+            timer.unref?.();
+            return () => clearTimeout(timer);
+          },
+          // No `onWake`: that option hands the alarm to the host (a Cloudflare-style device), and the Harness then arms no
+          // timer of its own. A local device stays up, so it lets the Harness keep the alarm through `setTimer` — passing
+          // both made every sleep depend on a host kick that also had to be re-armed by hand.
         },
         ctx,
       );
@@ -594,6 +647,12 @@ export class Store {
       unlock();
       throw e;
     }
+  }
+
+  /** The device's one code-mode sandbox, created on first use (and once: two would double the wasm footprint). */
+  private async codeMode() {
+    this.codemode ??= import("./codemode.js").then((module) => module.createCodemode());
+    return this.codemode;
   }
 
   async scanAll(h: Harness): Promise<ConversationRecord[]> {
@@ -727,7 +786,7 @@ export class Store {
 
   async agentDetail(row: SessionRow, c: Conversation): Promise<AgentDetail> {
     const { agent, all, offered } = await this.toolsOf(c);
-    const writers = all.filter((t) => WRITE_TOOLS.has(t.name));
+    const writers = all.filter((t) => !isReadTool(t));
     return {
       ...(await this.agentSummary(row, c)),
       sessionId: row.id,
@@ -743,7 +802,7 @@ export class Store {
         description: t.description,
         replay: (t.replay ?? "unsafe") as "safe" | "unsafe",
         parameters: JSON.parse(JSON.stringify(t.parameters ?? {})),
-        writes: WRITE_TOOLS.has(t.name),
+        writes: !isReadTool(t),
         offered: offered.has(t.name),
       })),
       extensions: agent.extensions.map((e) => e.name),
@@ -808,10 +867,11 @@ export class Store {
       cwd = (await this.browse(body.cwd)).path;
     }
     if (body.readOnly !== undefined && typeof body.readOnly !== "boolean") throw invalid("readOnly must be a boolean");
-    // Read only filters the agent's tools: the model is never offered the ones that create, update or delete.
+    // Read only filters the agent's tools: the model is never offered anything that is not declared a read tool, so a
+    // tool nobody classified is dropped rather than offered.
     const tools =
       body.readOnly === true
-        ? { tools: { remove: (await this.toolsOf(c)).all.filter((t) => WRITE_TOOLS.has(t.name)) } }
+        ? { tools: { remove: (await this.toolsOf(c)).all.filter((t) => !isReadTool(t)) } }
         : body.readOnly === false
           ? { tools: null }
           : {};
@@ -888,19 +948,27 @@ export class Store {
   }
 
   async tasks(h: Harness, status: string, limit: number): Promise<TaskOutcome[]> {
+    const take = Math.min(Math.max(limit, 1), 200);
+    const wanted = (t: { state: { status: string } }) =>
+      status === "terminal" ? t.state.status === "terminal" : t.state.status !== "terminal";
+    // Newest first, stopping as soon as the page holds enough matches: the list is a window, not a full scan. The cap
+    // only matters when a session holds thousands of tasks of the other status.
     const items = await h.commit(async (tx) => {
-      let page = await tx.scanTasks({}, 500);
-      let all = [...page.items];
-      while (page.next) {
-        page = await tx.scanTasks({}, 500, page.next);
-        all = [...all, ...page.items].slice(-2000);
+      const found: Array<Awaited<ReturnType<typeof tx.scanTasks>>["items"][number]> = [];
+      let scanned = 0;
+      let page = await tx.scanTasks({ order: "descending" }, 200);
+      for (;;) {
+        for (const task of page.items) {
+          if (!wanted(task)) continue;
+          found.push(task);
+          if (found.length >= take) return found;
+        }
+        scanned += page.items.length;
+        if (!page.next || scanned >= 5000) return found;
+        page = await tx.scanTasks({ order: "descending" }, 200, page.next);
       }
-      return all;
     }, ctx);
-    const wanted = items.filter((t) =>
-      status === "terminal" ? t.state.status === "terminal" : t.state.status !== "terminal",
-    );
-    return wanted.slice(-Math.min(Math.max(limit, 1), 200)).reverse().map((t) => ({
+    return items.map((t) => ({
       id: t.id as number,
       kind: (t as { kind?: string }).kind ?? (t as { definition?: string }).definition ?? "task",
       conversationId: (t as { conversationId?: number }).conversationId,
@@ -918,8 +986,69 @@ export class Store {
     return h.inspect(ctx);
   }
 
+  /**
+   * The device's own health, for the dashboard: counters and durations, how many tasks are live and in what state, how
+   * long finished tasks took, and the failures the runtime reported. Read from memory and the open sessions' task
+   * records only, so asking is cheap enough to poll.
+   */
+  async runtime(): Promise<WireRuntime> {
+    const telemetry = this.telemetry.snapshot();
+    const sessions: WireRuntimeSession[] = [];
+    for (const [id, opened] of this.opened) {
+      const byState: Record<string, number> = {};
+      const durations: number[] = [];
+      try {
+        for (const task of (await opened.harness.inspect(ctx)).tasks)
+          byState[task.state.kind] = (byState[task.state.kind] ?? 0) + 1;
+        // `inspect()` describes live tasks only, so the durations come from the newest finished records: a window, not a
+        // scan of every task the session ever ran.
+        const finished = await opened.harness.commit(async (tx) => tx.scanTasks({ order: "descending" }, 200), ctx);
+        for (const task of finished.items) {
+          const { startedAt, endedAt } = task;
+          if (task.state.status === "terminal" && startedAt !== undefined && endedAt !== undefined)
+            durations.push(Math.max(0, endedAt - startedAt));
+        }
+      } catch (e) {
+        // A session that cannot be inspected is the interesting case: say so instead of dropping it from the list.
+        sessions.push({ id, byState, durations: { count: 0, avgMs: 0, maxMs: 0 }, error: (e as Error).message });
+        continue;
+      }
+      const total = durations.reduce((sum, ms) => sum + ms, 0);
+      sessions.push({
+        id,
+        byState,
+        durations: {
+          count: durations.length,
+          avgMs: durations.length ? Math.round(total / durations.length) : 0,
+          maxMs: durations.length ? Math.max(...durations) : 0,
+        },
+        ...(this.errors.get(id) === undefined ? {} : { error: this.errors.get(id) }),
+      });
+    }
+    const reports = telemetry.reports.slice(-50).map((report) => ({
+      at: report.at,
+      kind: report.kind,
+      message: report.message,
+      ...(report.reason === undefined ? {} : { reason: report.reason }),
+      ...(report.restarts === undefined ? {} : { restarts: report.restarts }),
+    }));
+    return {
+      at: Date.now(),
+      uptimeMs: Date.now() - this.startedAt,
+      storageFailed: telemetry.storageFailed,
+      counters: telemetry.counters,
+      histograms: telemetry.histograms,
+      byKind: telemetry.byKind,
+      restarts: reports.reduce((sum, report) => sum + (report.restarts ?? 0), 0),
+      reports,
+      sessions,
+    };
+  }
+
   async entries(c: Conversation, cursor: string | undefined, limit: number): Promise<Page<WireEntry>> {
-    const page = await c.entries({}, Math.min(Math.max(limit, 1), 2000), decodeCursor(cursor), ctx);
+    // Newest first, pinned: storage defaults entries to descending, and the API's paging reads as "the latest window".
+    // Naming it keeps that meaning if the default ever changes.
+    const page = await c.entries({ order: "descending" }, Math.min(Math.max(limit, 1), 2000), decodeCursor(cursor), ctx);
     return { items: page.items as unknown as WireEntry[], next: encodeCursor(page.next) };
   }
 
@@ -1205,6 +1334,8 @@ export class Store {
 
   async close() {
     this.sharedCommits?.detach();
+    // A device that never used code mode never loaded the sandbox; one that did stops its workers here.
+    await this.codemode?.then((code) => code.close()).catch(() => undefined);
     for (const { harness, unlock, unsubscribe } of this.opened.values()) {
       unsubscribe();
       try {
