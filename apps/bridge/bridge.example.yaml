@@ -1,0 +1,48 @@
+# Copy to bridge.yaml (git-ignored) and fill in. This file holds secrets: keep it off git and readable by
+# your user only. The platform must reach `listen` over HTTPS, usually through a reverse proxy.
+# Card wording follows this; the log stays English.
+language: zh
+
+listen:
+  host: 0.0.0.0
+  port: 4788
+  path: /feishu/events
+
+state:
+  # Replies still owed to a chat. A restart reads this and answers them instead of dropping them.
+  # Relative paths sit next to this file; keep it on the same disk as bridge.yaml.
+  file: bridge-state.json
+
+device:
+  # The backend that owns the agent. Keep it on localhost or a private network, never the public internet.
+  url: http://127.0.0.1:4782
+  hooks:
+    # Same secret as ~/.dpi/hooks.json → "feishu-work".secret. Rotate both and restart.
+    feishu-work: "at-least-32-characters-long-secret"
+  # A hook call may block this long; after that the bridge polls until max_wait_ms.
+  wait_ms: 240000
+  poll_ms: 5000
+  max_wait_ms: 1200000
+
+feishu:
+  app_id: cli_xxxxxxxxxxxxxxxx
+  app_secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  # Recommended: without it anyone who can post to the URL can forge events.
+  encrypt_key: xxxxxxxxxxxxxxxxxxxxxxxx
+  verification_token: xxxxxxxxxxxxxxxxxxxxxxxx
+  # Optional: only accept a group message that @ this bot.
+  bot_open_id: ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  api_base: https://open.feishu.cn
+  # Post the agent's answer back on the triggering message.
+  reply: true
+  # Also post "收到，开始处理" immediately. Two messages per task.
+  ack: false
+  # Post an approval card when a job run waits for you; the buttons decide on the device.
+  cards: true
+  # Open ids that may press those buttons. Empty means anyone in a routed chat.
+  approvers: []
+
+# chat_id → hook name. "*" catches every chat that is not listed; drop it to ignore unknown chats.
+routes:
+  oc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx: feishu-work
+  "*": feishu-work

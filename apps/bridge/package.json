@@ -1,0 +1,21 @@
+{
+  "name": "@dpi-product/bridge",
+  "private": true,
+  "type": "module",
+  "description": "Turns a chat mention (Feishu today) into a signed hook call on one device, then posts the agent's answer back.",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "check": "tsc --noEmit -p .",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "tsx": "^4.20.0",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "typescript": "5.9.3"
+  }
+}
