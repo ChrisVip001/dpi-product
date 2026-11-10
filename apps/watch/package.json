@@ -1,0 +1,21 @@
+{
+  "name": "@dpi-product/watch",
+  "private": true,
+  "type": "module",
+  "description": "Desktop notifications for one device: a finished turn, a task waiting for you, the device going away.",
+  "bin": {
+    "watch": "./bin/watch.mjs"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "check": "tsc --noEmit -p .",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "5.9.3"
+  }
+}
