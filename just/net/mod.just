@@ -1,4 +1,4 @@
-# Durable Agent Network devices. Every recipe takes an id from dpi-network.yaml,
+# DPI network devices. Every recipe takes an id from dpi-network.yaml,
 # then runs the driver for that device's kind (local, ssh, exe-dev, url).
 
 set shell := ["zsh", "-cu"]

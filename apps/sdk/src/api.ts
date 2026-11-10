@@ -1,4 +1,4 @@
-// The Durable Agent Network wire contract: every JSON body and stream frame between
+// The DPI wire contract: every JSON body and stream frame between
 // backend and its clients. Types only, so browsers, Node and the TUI share it.
 //
 // Agent state is derived from pi-durable 1.5 conversation views: `snapshot` on attach, then `view`
@@ -137,7 +137,7 @@ export const DEFAULT_COMPACTION: CompactionSettings = {
   keepRecentTokens: 2000,
 };
 
-/** The playground's default marker positions: a summary starts in the background at 200k tokens, and the next
+/** The default marker positions: a summary starts in the background at 200k tokens, and the next
  * request waits for it at 250k. */
 export const DEFAULT_COMPACTION_AT = { auto: 200_000, wait: 250_000 };
 

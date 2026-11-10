@@ -1,6 +1,6 @@
 # tui
 
-A pi-like terminal client for one Durable Agent Network device. It talks straight to a device's `backend` over the [v1 API](../backend/API.md) with the device's bearer token, and renders the same transcript items as the web client (`AgentModel` + `toTranscript` from [`sdk`](../sdk)). Closing it never stops the agent.
+A terminal client for one DPI device. It talks straight to a device's `backend` over the [v1 API](../backend/API.md) with the device's bearer token, and renders the same transcript items as the web client (`AgentModel` + `toTranscript` from [`sdk`](../sdk)). Closing it never stops the agent.
 
 ```bash
 just tui attach mac-mini                   # pick a session on mac-mini (or create one in any directory)
@@ -31,15 +31,21 @@ Commands: `/sessions`, `/agents`, `/model`, `/devices`, `/new [name]`, `/fork [e
 
 A send that fails on the network retries with the same `requestId`, so the device admits it once. A failed send keeps the editor text.
 
+## Language
+
+The interface follows `LANG` (English or Chinese) and `DPI_LANG=zh` overrides it. Keys, commands and status
+words change; agent names, ids and paths do not.
+
 ## Layout
 
 ```
+src/i18n.ts      the words, in both languages
 src/main.ts      args, device resolution, --new
 src/app.ts       TuiAltScreen layout, agent + session streams (SDK follow), keys, submit
 src/render.ts    transcript items → components, cached by item id
 src/pickers.ts   sessions (+ new session with a remote directory walk), agents, models, devices
 src/commands.ts  slash commands
-src/theme.ts     colors and pi-tui themes
+src/theme.ts     colors and `pi-tui` themes
 bin/tui.mjs  runs src/main.ts through tsx, for npm link or npx tui
 ```
 

@@ -16,6 +16,8 @@ unit:
     cd apps/backend && npm run check && npm test
     cd apps/hub && npm run build && npm run lint && npm test
     cd apps/tui && npm run check && npm test
+    cd apps/watch && npm run check && npm test
+    cd apps/bridge && npm run check && npm test
 
 # Web UI suite against two faux devices (builds the UI first)
 [no-cd]

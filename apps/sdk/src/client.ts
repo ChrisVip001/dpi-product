@@ -34,7 +34,7 @@ const newId = (): string =>
 
 /**
  * Typed client for one backend. Works in browsers and Node (fetch + streams).
- * `token` is optional: the playground hub injects it, so browsers never hold one.
+ * `token` is optional: the hub injects it, so browsers never hold one.
  */
 export class DpiClient {
   readonly baseUrl: string;

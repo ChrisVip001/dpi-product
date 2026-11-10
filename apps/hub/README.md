@@ -1,8 +1,8 @@
-# Durable Pi Playground: hub + web client
+# DPI hub: hub + web client
 
-The web interface of the Durable Agent Network. It runs no agents. The **hub** (Node, Express) keeps the device registry and tokens, proxies REST calls to each device's [`backend`](../backend), and multiplexes every device, session and agent stream into one SSE connection per browser tab. The **FE** (Vue 3, Vite 8) renders those streams through the SDK models in [`../sdk`](../sdk).
+The web interface of a DPI network. It runs no agents. The **hub** (Node, Express) keeps the device registry and tokens, proxies REST calls to each device's [`backend`](../backend), and multiplexes every device, session and agent stream into one SSE connection per browser tab. The **FE** (Vue 3, Vite 8) renders those streams through the SDK models in [`../sdk`](../sdk).
 
-See the [repository README](../../README.md) for screenshots, the network setup and the demo.
+See the [repository README](../../README.md) for the network setup and a walkthrough.
 
 ## Run
 
@@ -22,6 +22,13 @@ npm run dev                          # Vite middleware with hot reload (no build
 | `DPI_HOME` | `~/.dpi` | where `network.sqlite` lives |
 | `DPI_NETWORK_FILE` | `dpi-network.yaml`, found by walking up from the app | devices seeded into the registry at boot |
 
+## Language
+
+The web client ships English and Chinese. It follows the choice saved in `ui_state`, or the browser's own
+language when nothing is saved; `DPI_LANG=zh` on the hub process overrides both and hides the picker. Words
+live in `apps/web/src/i18n/catalog.ts`, one flat map per language, and `tests/i18n.test.ts` fails if they drift
+apart.
+
 ## Hub API
 
 | Route | Purpose |
@@ -29,6 +36,7 @@ npm run dev                          # Vite middleware with hot reload (no build
 | `GET /api/network` | devices with live status, device info and the last known tree (never tokens), plus `configFile`, the loaded `dpi-network.yaml` |
 | `POST /api/devices/:id/check` | probe a device now. There are no device write routes: devices come from `dpi-network.yaml` and `just net register` |
 | `GET`/`PUT /api/ui-state/:key` | selection, panel layout and tree width |
+| `GET /api/config` | `{ locale }`, from `DPI_LANG`; null means the browser chooses |
 | `GET /api/stream` | the tab's SSE connection. The first frame carries its `streamId` |
 | `PUT /api/stream/:streamId {subs}` | `<dev>/device?docs=…`, `<dev>/session/<sid>`, `<dev>/agent/<sid>/<aid>?docs=…`. Up to 20 keys. `network` is always on |
 | `ALL /api/devices/:id/v1/*` | REST proxy with the device token injected. Answers 503 while the device is not online and 502 when it does not answer. Paths ending in `/events` answer 400: streams go through `/api/stream` |
@@ -40,7 +48,7 @@ npm run dev                          # Vite middleware with hot reload (no build
 ```text
 apps/server/src/   main (routes, options), monitor (status machine per device), proxy, mux, guard, seed
 apps/web/src/
-  App.vue                       top bar; network tree | inspector | agent view; help and path dialogs
+  App.vue                       top bar; network tree | conversation | inspector; help and path dialogs
   client/                       stream.ts (one EventSource, named slots), hub.ts, composables.ts, store.ts,
                                 commands.ts (slash commands), jobs.ts (durable job runs),
                                 signature.ts (tool parameters as a TypeScript declaration), markdown.ts, ids.ts

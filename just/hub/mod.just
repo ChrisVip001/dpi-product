@@ -1,4 +1,4 @@
-# The playground hub and web client: http://localhost:4781.
+# The hub and web client: http://localhost:4781.
 
 set shell := ["zsh", "-cu"]
 set positional-arguments

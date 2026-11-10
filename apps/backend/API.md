@@ -1,6 +1,6 @@
 # backend API v1
 
-The contract every Durable Agent Network client uses: the web hub, `tui`, scripts, other agents. Types live in [`../sdk/src/api.ts`](../sdk/src/api.ts). [`../sdk/src/client.ts`](../sdk/src/client.ts) is a typed client for browsers and Node.
+The contract every DPI client uses: the web hub, `tui`, scripts, other agents. Types live in [`../sdk/src/api.ts`](../sdk/src/api.ts). [`../sdk/src/client.ts`](../sdk/src/client.ts) is a typed client for browsers and Node.
 
 ## Conventions
 
@@ -50,7 +50,7 @@ The contract every Durable Agent Network client uses: the web hub, `tui`, script
 
 ## Agent tools
 
-Every agent gets the coding tools `read`, `write`, `edit` and `bash`, plus the playground tools `read_state`, `update_state`, `list_durable_jobs`, `run_durable_job`, `check_durable_job`, `search_history`, `ping_on_call_engineer`, `subagent`, `start_session` and `handoff`. `readOnly` removes the eight that write: `bash`, `write`, `edit`, `update_state`, `run_durable_job`, `ping_on_call_engineer`, `subagent` and `start_session`. `GET .../agents/:a` lists each tool with its replay policy and whether it is offered.
+Every agent gets the coding tools `read`, `write`, `edit` and `bash`, plus the built-in tools `read_state`, `update_state`, `list_durable_jobs`, `run_durable_job`, `check_durable_job`, `search_history`, `ping_on_call_engineer`, `subagent`, `start_session` and `handoff`. `readOnly` removes the eight that write: `bash`, `write`, `edit`, `update_state`, `run_durable_job`, `ping_on_call_engineer`, `subagent` and `start_session`. `GET .../agents/:a` lists each tool with its replay policy and whether it is offered.
 
 ## Durable jobs
 
@@ -62,7 +62,7 @@ A durable job is a repeatable workflow with named phases. Each run is one pi-dur
 | `release-check` | plan → gather (subagent with read and bash) → approve (waits for a person) → publish → verify | `commits` |
 | `change-watch` | baseline → watch (one checkpoint per check) → report | `path`, `checks`, `interval_seconds` |
 
-Agents use the playground tools: `list_durable_jobs` (ids, phases, inputs, approval, result path and recent runs with their task ids), `run_durable_job {job, input?, wait?}` and `check_durable_job {task_id? | job?}` (one run's phases, steps and result, a job's latest run, or recent runs). A run starts in the background, owned by the conversation; with `wait: true` the call owns it and waits, so an interrupt stops it. The same extension adds `search_history {query?, tool?, entry?, kind?, from_entry?, to_entry?, order?, limit?, offset?}`, which pages through the agent's whole stored history including entries before a reset or compaction, and `ping_on_call_engineer {summary, severity?}`, a simulated pager (no external call) that is not replay-safe and works once per agent.
+Agents use the built-in tools: `list_durable_jobs` (ids, phases, inputs, approval, result path and recent runs with their task ids), `run_durable_job {job, input?, wait?}` and `check_durable_job {task_id? | job?}` (one run's phases, steps and result, a job's latest run, or recent runs). A run starts in the background, owned by the conversation; with `wait: true` the call owns it and waits, so an interrupt stops it. The same extension adds `search_history {query?, tool?, entry?, kind?, from_entry?, to_entry?, order?, limit?, offset?}`, which pages through the agent's whole stored history including entries before a reset or compaction, and `ping_on_call_engineer {summary, severity?}`, a simulated pager (no external call) that is not replay-safe and works once per agent.
 
 ## Streams
 

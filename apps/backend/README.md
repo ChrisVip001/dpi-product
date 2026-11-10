@@ -1,9 +1,9 @@
 # backend
 
-The Durable Pi **device server**. Run one on every machine that should host durable agents: your laptop, a Mac mini, a Linux box, an exe.dev VM. It owns the harnesses, the SQLite databases, the tools and the filesystem. Clients connect with the device's **URL and bearer token** through the [v1 API](API.md).
+The DPI **device server**. Run one on every machine that should host durable agents: your laptop, a Mac mini, a Linux box, an exe.dev VM. It owns the harnesses, the SQLite databases, the tools and the filesystem. Clients connect with the device's **URL and bearer token** through the [v1 API](API.md).
 
 ```
-client (hub / tui / curl) ──HTTP + SSE, Bearer──► backend ──► sessions/<id>/agent.sqlite (pi-durable)
+client (hub / tui / curl) ──HTTP + SSE, Bearer──► backend ──► sessions/<id>/agent.sqlite (one harness)
 ```
 
 ## Run it on this machine
@@ -63,8 +63,8 @@ Templates live in [`deploy/`](deploy/). The operator skill [`.claude/skills/agen
 ~/dpi/apps/backend, ~/dpi/apps/sdk     code (rsynced; safe to replace)
 ~/.dpi/backend.env                              token + config (0600)
 ~/.dpi/backend/catalog.sqlite                   sessions, agent names, device uid, idempotency keys, compaction thresholds
-~/.dpi/backend/app-state.sqlite                 the device's shared App State (demo extension)
-~/.dpi/backend/sessions/<uuid>/agent.sqlite     one pi-durable harness per session
+~/.dpi/backend/app-state.sqlite                 the device's shared App State (built-in extension)
+~/.dpi/backend/sessions/<uuid>/agent.sqlite     one harness per session
 ~/.dpi/backend/archive/                          archived sessions (DELETE never removes files)
 ~/.dpi/backend.log                              service log
 ```
@@ -114,6 +114,6 @@ curl -s "$U/v1/sessions/oneshot/agents/main/messages" "${H[@]}" \
 
 ```bash
 npm run dev     # restart on file changes (just backend dev)
-npm run check   # strict types, including the pi-durable ↔ SDK wire contract check
+npm run check   # strict types, including the harness ↔ SDK wire contract check
 npm test        # api, streams, store (jobs, start_session, extensions, read only), search_history, shared state and SIGKILL recovery (faux provider, no network)
 ```

@@ -1,4 +1,4 @@
-// The playground hub: the local registry of devices (~/.dpi/network.sqlite), their live status,
+// The hub: the local registry of devices (~/.dpi/network.sqlite), their live status,
 // a REST proxy that injects device tokens, one multiplexed SSE stream per browser tab, and the
 // Vue client. It runs no agents; every agent lives in some device's backend.
 import express from "express";
@@ -64,6 +64,8 @@ app.disable("x-powered-by");
 app.use("/api", guard(allowedHosts), express.json({ limit: "256kb" }));
 
 app.get("/api/network", (_req, res) => res.json({ configFile, devices: monitor.network() }));
+// DPI_LANG on the hub process overrides the language a browser saves; null means "the browser decides".
+app.get("/api/config", (_req, res) => res.json({ locale: process.env.DPI_LANG ?? null }));
 // Devices are configured in dpi-network.yaml and `just net register`; the hub only reads them.
 app.post(
   "/api/devices/:id/check",

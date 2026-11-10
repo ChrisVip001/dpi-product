@@ -15,6 +15,12 @@ mod hub 'just/hub'
 # Terminal client for one device
 mod tui 'just/tui'
 
+# Desktop notifications for one device
+mod watch 'just/watch'
+
+# Public door for chat mentions, as signed hook calls on one device
+mod bridge 'just/bridge'
+
 # Unit, UI, device and e2e suites
 mod test 'just/test'
 
@@ -28,6 +34,8 @@ install:
     cd apps/backend && npm install --no-audit --no-fund
     cd apps/hub && npm install --no-audit --no-fund
     cd apps/tui && npm install --no-audit --no-fund
+    cd apps/watch && npm install --no-audit --no-fund
+    cd apps/bridge && npm install --no-audit --no-fund
 
 # Type checks and unit tests, every app
 check: test::unit

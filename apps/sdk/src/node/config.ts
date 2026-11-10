@@ -1,4 +1,4 @@
-// Load dpi-network.yaml: the declared devices of a Durable Agent Network.
+// Load dpi-network.yaml: the declared devices of a DPI network.
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parse } from "yaml";

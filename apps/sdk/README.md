@@ -1,6 +1,6 @@
 # sdk
 
-The shared contract of the Durable Agent Network. Every client in this repo (the hub, the web client, `tui`, the test suites and `just net`) builds on it, and so can yours. It has no runtime dependencies in `src/`, and everything outside `src/node/` also runs in browsers. `src/node/` uses `yaml`, `node:sqlite` and child processes, so it needs Node 22.19 or newer (the repo pins 24).
+The shared contract of a DPI network. Every client in this repo (the hub, the web client, `tui`, the test suites and `just net`) builds on it, and so can yours. It has no runtime dependencies in `src/`, and everything outside `src/node/` also runs in browsers. `src/node/` uses `yaml`, `node:sqlite` and child processes, so it needs Node 22.19 or newer (the repo pins 24).
 
 The apps import it by relative path (`../../sdk/src/client.ts`, or `@sdk/*` in the Vite client). It is not published to npm.
 

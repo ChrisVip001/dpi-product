@@ -1,4 +1,4 @@
-// The client-side device registry: ~/.dpi/network.sqlite. Shared by the playground hub,
+// The client-side device registry: ~/.dpi/network.sqlite. Shared by the hub,
 // tui and scripts/net.ts on this machine. Holds tokens (mode 0600), live status and UI state.
 import { DatabaseSync } from "node:sqlite";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";

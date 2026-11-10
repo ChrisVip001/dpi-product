@@ -1,5 +1,10 @@
 # secrets and this machine's device list (template: dpi-network.example.yaml)
 dpi-network.yaml
+# platform app secrets and hook secrets (template: apps/bridge/bridge.example.yaml)
+apps/bridge/bridge.yaml
+# replies still owed to a chat; runtime data, holds chat ids
+apps/bridge/bridge-state.json
+**/hooks.json
 .env
 .env.*
 !.env.example
@@ -12,7 +17,6 @@ node_modules/
 __pycache__/
 
 # runtime data (agent databases never belong in git)
-**/.durable-pi/
 **/.data/
 **/workspace/
 *.sqlite
