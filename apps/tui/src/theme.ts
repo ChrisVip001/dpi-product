@@ -1,4 +1,4 @@
-// Colors follow the playground: warm dark, pink accent, amber secondary.
+// The palette: warm dark, pink accent, amber secondary.
 import type { EditorTheme, MarkdownTheme, SelectListTheme } from "@earendil-works/pi-tui";
 
 const rgb = (hex: string) => {

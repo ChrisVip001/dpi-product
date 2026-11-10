@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import { CornerLeftUp, Folder, FolderOpen, Home } from "lucide-vue-next";
 import type { DirListing } from "@sdk/api";
 import { deviceClient, message } from "../client/hub";
+import { t } from "../i18n";
 
 const props = defineProps<{ deviceId: string }>();
 const cwd = defineModel<string>({ required: true });
@@ -50,7 +51,7 @@ watch(
     <div class="dir-path">
       <input
         v-model="cwd"
-        aria-label="Working directory"
+        :aria-label="t('dir.workingDirectory')"
         required
         placeholder="/path/to/project"
         spellcheck="false"
@@ -58,12 +59,17 @@ watch(
         @keydown.enter.prevent="open(cwd)"
       />
       <button type="button" class="secondary small" :disabled="loading || !cwd" @click="open(cwd)">
-        Go
+        {{ t("dir.go") }}
       </button>
     </div>
-    <div class="dir-list" role="listbox" aria-label="Directories" :aria-busy="loading">
-      <button type="button" class="dir-item" title="Start directories" @click="open('')">
-        <Home :size="16" /><span>Start dirs</span>
+    <div class="dir-list" role="listbox" :aria-label="t('dir.directories')" :aria-busy="loading">
+      <button
+        type="button"
+        class="dir-item"
+        :title="t('dir.startDirsTitle')"
+        @click="open('')"
+      >
+        <Home :size="16" /><span>{{ t("dir.startDirs") }}</span>
       </button>
       <button
         v-if="listing?.parent"
@@ -88,7 +94,7 @@ watch(
           d.name
         }}</span>
       </button>
-      <p v-if="listing && !listing.dirs.length" class="hint">No subdirectories.</p>
+      <p v-if="listing && !listing.dirs.length" class="hint">{{ t("dir.noSubdirs") }}</p>
     </div>
     <p v-if="error" class="message-error" role="alert">{{ error }}</p>
   </div>

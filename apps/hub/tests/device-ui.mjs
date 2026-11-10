@@ -21,7 +21,7 @@ await fetch(`${hub}/api/ui-state/layout.panels`, {
 });
 const browser = await chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
 const page = await (
-  await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  await browser.newContext({ viewport: { width: 1600, height: 1000 }, locale: "en-US" })
 ).newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));

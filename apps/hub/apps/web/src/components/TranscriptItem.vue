@@ -5,11 +5,18 @@ import { markdown } from "../client/markdown";
 import { json } from "../client/store";
 import { runByCall, runById } from "../client/jobs";
 import JobCard from "./JobCard.vue";
+import { t } from "../i18n";
 
 defineProps<{ item: TranscriptItem }>();
 const emit = defineEmits<{ fork: [entryId: number] }>();
 const statusLabel = (call: ToolCallView) =>
-  call.status === "error" ? "Error" : call.status === "done" ? "Done" : call.status;
+  call.status === "error"
+    ? t("entry.statusError")
+    : call.status === "done"
+      ? t("entry.statusDone")
+      : call.status === "running"
+        ? t("taskStatus.running")
+        : call.status;
 const entryClass = (item: TranscriptItem) =>
   item.kind === "user"
     ? "pi-user"
@@ -28,29 +35,29 @@ const entryClass = (item: TranscriptItem) =>
   <article class="entry" :class="entryClass(item)">
     <template v-if="item.kind === 'user'"
       ><div class="message-label">
-        YOU <span>#{{ item.id }}</span>
+        {{ t("entry.you") }} <span>#{{ item.id }}</span>
       </div>
       <div class="user-message">{{ item.text }}</div></template
     >
     <template v-else-if="item.kind === 'assistant'"
       ><div class="message-label">
-        AGENT
-        <span v-if="item.streaming" class="streaming">Working</span
+        {{ t("view.agentLabel") }}
+        <span v-if="item.streaming" class="streaming">{{ t("view.working") }}</span
         ><span v-else>#{{ item.id }}</span
         ><button
           v-if="!item.streaming"
           class="fork-button"
-          :aria-label="`Fork at entry ${item.id}`"
-          title="Fork from this entry. App State stays shared."
+          :aria-label="t('entry.forkAt', { id: item.id })"
+          :title="t('entry.forkTitle')"
           @click="emit('fork', item.id as number)"
         >
-          <GitFork :size="18" />Fork
+          <GitFork :size="18" />{{ t("entry.fork") }}
         </button>
       </div>
       <template v-for="(b, j) in item.blocks" :key="j"
         ><div v-if="b.type === 'text'" class="markdown" v-html="markdown(b.text)" />
         <details v-else-if="b.type === 'thinking'" class="thinking">
-          <summary>Thinking</summary>
+          <summary>{{ t("inspector.thinking") }}</summary>
           <div>{{ b.text }}</div>
         </details>
         <details
@@ -67,25 +74,25 @@ const entryClass = (item: TranscriptItem) =>
             ><code>{{ json(b.call.args)?.slice(0, 90) }}</code>
             <span class="tool-status">{{ statusLabel(b.call) }}</span>
           </summary>
-          <div class="tool-section-label">Input</div>
+          <div class="tool-section-label">{{ t("entry.input") }}</div>
           <pre>{{ json(b.call.args) }}</pre>
           <template v-if="b.call.result !== undefined">
             <div class="tool-section-label">
-              <span>Result</span>
+              <span>{{ t("entry.result") }}</span>
               <button
                 v-if="b.call.resultEntryId !== undefined"
                 class="fork-button"
-                :aria-label="`Fork at entry ${b.call.resultEntryId}`"
-                title="Fork after this result"
+                :aria-label="t('entry.forkAt', { id: b.call.resultEntryId })"
+                :title="t('entry.forkAfterResult')"
                 @click="emit('fork', b.call.resultEntryId!)"
               >
-                <GitFork :size="18" />Fork
+                <GitFork :size="18" />{{ t("entry.fork") }}
               </button>
             </div>
             <pre>{{ b.call.result }}</pre>
           </template>
           <template v-else-if="b.call.output">
-            <div class="tool-section-label">Live output</div>
+            <div class="tool-section-label">{{ t("entry.liveOutput") }}</div>
             <pre>{{ b.call.output }}</pre>
           </template>
         </details>
@@ -103,13 +110,13 @@ const entryClass = (item: TranscriptItem) =>
           <Check v-if="!item.isError" :size="18" /><Info v-else :size="18" /><strong>{{
             item.name
           }}</strong
-          ><span>{{ item.isError ? "error" : "result" }}</span
+          ><span>{{ item.isError ? t("entry.error") : t("entry.resultTag") }}</span
           ><button
             class="fork-button"
-            :aria-label="`Fork at entry ${item.id}`"
+            :aria-label="t('entry.forkAt', { id: item.id })"
             @click.prevent="emit('fork', item.id)"
           >
-            <GitFork :size="18" />Fork
+            <GitFork :size="18" />{{ t("entry.fork") }}
           </button>
         </summary>
         <pre>{{ item.text }}</pre>
@@ -118,10 +125,13 @@ const entryClass = (item: TranscriptItem) =>
     <div v-else-if="item.kind === 'tool'" class="live-tool">
       <div>
         <Activity :size="18" /><strong>{{ item.call.name }}</strong
-        ><span>{{ item.call.status }}</span>
+        ><span>{{ statusLabel(item.call) }}</span>
       </div>
       <pre v-if="item.call.output">{{ item.call.output }}</pre>
-      <JobCard v-if="item.call.name === 'run_durable_job' && runByCall(item.call.callId)" :run="runByCall(item.call.callId)!" />
+      <JobCard
+        v-if="item.call.name === 'run_durable_job' && runByCall(item.call.callId)"
+        :run="runByCall(item.call.callId)!"
+      />
     </div>
     <JobCard
       v-else-if="item.entryKind === 'demo.job' && runById((item.data as { taskId: number }).taskId)"
@@ -135,14 +145,14 @@ const entryClass = (item: TranscriptItem) =>
         /><span>{{ item.text }}</span
         ><button
           class="fork-button"
-          :aria-label="`Fork at entry ${item.id}`"
+          :aria-label="t('entry.forkAt', { id: item.id })"
           @click="emit('fork', item.id)"
         >
-          <GitFork :size="18" />Fork
+          <GitFork :size="18" />{{ t("entry.fork") }}
         </button>
       </div>
       <details v-if="item.note" class="raw">
-        <summary>Context note</summary>
+        <summary>{{ t("entry.contextNote") }}</summary>
         <pre>{{ item.note }}</pre>
       </details></template
     >

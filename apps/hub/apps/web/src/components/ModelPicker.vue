@@ -13,6 +13,7 @@ import {
   number,
   refreshDetail,
 } from "../client/store";
+import { t } from "../i18n";
 
 const emit = defineEmits<{ close: [] }>();
 const search = ref("");
@@ -31,7 +32,7 @@ async function choose(m: ModelInfo) {
   );
   if (done) {
     await refreshDetail();
-    notify("Model saved. Used on the next turn.");
+    notify(t("models.saved"));
     emit("close");
   }
 }
@@ -42,14 +43,18 @@ async function choose(m: ModelInfo) {
     <section class="modal model-modal">
       <header>
         <div>
-          <span class="eyebrow">PER AGENT · {{ device?.id }}</span>
-          <h2>Choose a model</h2>
+          <span class="eyebrow">{{ t("models.eyebrow", { device: device?.id ?? "" }) }}</span>
+          <h2>{{ t("models.title") }}</h2>
         </div>
-        <button class="icon-button" aria-label="Close model picker" @click="emit('close')">
+        <button class="icon-button" :aria-label="t('models.close')" @click="emit('close')">
           <X :size="18" />
         </button>
       </header>
-      <input v-model="search" placeholder="Search models or tiers…" aria-label="Search models" />
+      <input
+        v-model="search"
+        :placeholder="t('models.search')"
+        :aria-label="t('models.searchLabel')"
+      />
       <div class="model-list">
         <button
           v-for="m in filtered"
@@ -60,12 +65,15 @@ async function choose(m: ModelInfo) {
           <img :src="icon(m.id)" alt="" />
           <div>
             <strong>{{ m.name }}</strong
-            ><small>{{ m.tier }} / {{ m.provider }} / {{ number(m.contextWindow) }} context</small>
+            ><small
+              >{{ m.tier }} / {{ m.provider }} /
+              {{ t("models.context", { window: number(m.contextWindow) }) }}</small
+            >
           </div>
           <Check v-if="isCurrent(m)" :size="18" />
         </button>
       </div>
-      <p class="hint">Models available on {{ device?.id }}. Provider keys stay on the device.</p>
+      <p class="hint">{{ t("models.footnote", { device: device?.id ?? "" }) }}</p>
     </section>
   </div>
 </template>

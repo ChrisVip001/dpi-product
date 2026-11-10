@@ -6,6 +6,7 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { Info, X } from "lucide-vue-next";
 import { compactionThresholds, defaultCompaction, type CompactionSettings, type WireAssistantMessage } from "@sdk/api";
 import { agentState, attempt, currentModel, sessionHandle, sessionSummary, ui } from "../client/store";
+import { t } from "../i18n";
 
 const STEP = 512;
 const MIN_AUTO = 4096;
@@ -59,11 +60,11 @@ const clampAuto = (a: number, wait: number) => Math.min(wait - GAP, Math.max(MIN
 
 function move(which: "auto" | "wait", tokens: number) {
   const current = marks.value;
-  const t = Math.round(tokens / STEP) * STEP;
+  const snapped = Math.round(tokens / STEP) * STEP;
   draft.value =
     which === "wait"
-      ? { auto: current.auto, wait: clampWait(t, current.auto) }
-      : { auto: clampAuto(t, current.wait), wait: current.wait };
+      ? { auto: current.auto, wait: clampWait(snapped, current.auto) }
+      : { auto: clampAuto(snapped, current.wait), wait: current.wait };
 }
 
 async function save(patch: Partial<CompactionSettings>) {
@@ -111,16 +112,18 @@ function key(which: "auto" | "wait", e: KeyboardEvent) {
 <template>
   <section class="context-section" aria-labelledby="context-title">
     <div class="section-label">
-      <span id="context-title">CONTEXT</span>
+      <span id="context-title">{{ t("context.title") }}</span>
       <button v-if="window" class="context-details-toggle" @click="ui.dialog = { kind: 'compaction' }">
-        <Info :size="16" />Details
+        <Info :size="16" />{{ t("context.details") }}
       </button>
     </div>
-    <div v-if="!window" class="hint">Pick a model to see its context window.</div>
+    <div v-if="!window" class="hint">{{ t("context.pickModel") }}</div>
     <template v-else>
       <div class="context-numbers">
-        <strong>{{ k(used) }}</strong><span>of {{ k(window) }} tokens</span><span class="context-pct">{{ fullness }}%</span>
-        <span v-if="compacting" class="context-compacting"><i />Compacting</span>
+        <strong>{{ k(used) }}</strong
+        ><span>{{ t("context.ofTokens", { window: k(window) }) }}</span
+        ><span class="context-pct">{{ fullness }}%</span>
+        <span v-if="compacting" class="context-compacting"><i />{{ t("context.compacting") }}</span>
       </div>
       <div
         ref="bar"
@@ -131,48 +134,60 @@ function key(which: "auto" | "wait", e: KeyboardEvent) {
         @pointercancel="up"
       >
         <div class="context-fill" :class="{ hot: marks.auto !== undefined && used >= marks.auto }" :style="{ width: pct(used) }" />
-        <div class="context-reserve" :style="{ left: pct(marks.wait) }" title="Reserved for the answer" />
+        <div
+          class="context-reserve"
+          :style="{ left: pct(marks.wait) }"
+          :title="t('context.reserved')"
+        />
         <button
           v-if="marks.auto !== undefined"
           class="context-marker auto"
           :class="`label-${align(marks.auto)}`"
           role="slider"
-          aria-label="Automatic compaction starts at"
+          :aria-label="t('context.autoAria')"
           :aria-valuemin="MIN_AUTO"
           :aria-valuemax="marks.wait - GAP"
           :aria-valuenow="marks.auto"
-          :aria-valuetext="`${k(marks.auto)} tokens`"
+          :aria-valuetext="t('context.autoValue', { tokens: k(marks.auto) })"
           :style="{ left: pct(marks.auto) }"
           @pointerdown="down('auto', $event)"
           @keydown="key('auto', $event)"
           @keyup="commit"
           @blur="commit"
         >
-          <span class="context-marker-label">Auto-compact at {{ k(marks.auto) }}</span>
+          <span class="context-marker-label">{{
+            t("context.autoLabel", { tokens: k(marks.auto) })
+          }}</span>
         </button>
         <button
           class="context-marker wait"
           :class="`label-${align(marks.wait)}`"
           role="slider"
-          aria-label="The next request waits for a summary at"
+          :aria-label="t('context.waitAria')"
           :aria-valuemin="(marks.auto ?? MIN_AUTO) + GAP"
           :aria-valuemax="window - GAP"
           :aria-valuenow="marks.wait"
-          :aria-valuetext="`${k(marks.wait)} tokens, ${k(window - marks.wait)} reserved`"
+          :aria-valuetext="
+            t('context.waitValue', { tokens: k(marks.wait), reserved: k(window - marks.wait) })
+          "
           :style="{ left: pct(marks.wait) }"
           @pointerdown="down('wait', $event)"
           @keydown="key('wait', $event)"
           @keyup="commit"
           @blur="commit"
         >
-          <span class="context-marker-label">Reserve at {{ k(marks.wait) }}</span>
+          <span class="context-marker-label">{{
+            t("context.reserveLabel", { tokens: k(marks.wait) })
+          }}</span>
         </button>
       </div>
       <p class="hint context-hint">
-        <template v-if="settings.enabled"
-          >Compacts in the background at <strong>{{ k(marks.auto ?? marks.wait) }}</strong> and waits at
-          <strong>{{ k(marks.wait) }}</strong>.</template
-        ><template v-else>Automatic compaction is off.</template>
+        <template v-if="settings.enabled">
+          {{ t("context.hintBefore") }} <strong>{{ k(marks.auto ?? marks.wait) }}</strong>
+          {{ t("context.hintMid") }} <strong>{{ k(marks.wait) }}</strong
+          >{{ t("context.hintAfter") }}
+        </template>
+        <template v-else>{{ t("context.off") }}</template>
       </p>
     </template>
   </section>
@@ -180,27 +195,35 @@ function key(which: "auto" | "wait", e: KeyboardEvent) {
     <div v-if="detailsOpen" class="modal-backdrop" @click.self="closeDetails">
       <section class="modal compaction-modal" role="dialog" aria-modal="true" aria-labelledby="compaction-title">
         <header>
-          <h2 id="compaction-title">Context compaction</h2>
-          <button class="icon-button" aria-label="Close context compaction" @click="closeDetails">
+          <h2 id="compaction-title">{{ t("context.modalTitle") }}</h2>
+          <button
+            class="icon-button"
+            :aria-label="t('context.closeModal')"
+            @click="closeDetails"
+          >
             <X :size="18" />
           </button>
         </header>
         <p>
-          A summary starts in the background at <strong>{{ k(marks.auto ?? marks.wait) }}</strong>. Above
-          <strong>{{ k(marks.wait) }}</strong> the next request waits for it, keeping {{ k(window - marks.wait) }} free
-          for the answer. Drag a marker on the bar to change either point.
+          {{ t("context.modalBodyBefore") }}
+          <strong>{{ k(marks.auto ?? marks.wait) }}</strong>{{ t("context.modalBodyMid") }}
+          <strong>{{ k(marks.wait) }}</strong>
+          {{ t("context.modalBodyMid2") }} {{ k(window - marks.wait) }}
+          {{ t("context.modalBodyAfter") }}
         </p>
-        <p>Older entries stay stored, and <code>search_history</code> still finds them.</p>
+        <p>{{ t("context.stored") }}</p>
         <label class="context-toggle">
           <input
             type="checkbox"
             :checked="settings.enabled"
             @change="save({ enabled: ($event.target as HTMLInputElement).checked })"
           />
-          Automatic compaction
+          {{ t("context.autoToggle") }}
         </label>
-        <p class="hint">Applies to every agent in this session. <code>/compact</code> works either way.</p>
-        <footer><button class="secondary" @click="closeDetails">Close</button></footer>
+        <p class="hint">{{ t("context.applies") }}</p>
+        <footer>
+          <button class="secondary" @click="closeDetails">{{ t("common.close") }}</button>
+        </footer>
       </section>
     </div>
   </Teleport>

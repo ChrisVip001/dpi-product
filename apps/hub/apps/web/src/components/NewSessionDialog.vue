@@ -4,6 +4,7 @@ import { Plus, X } from "lucide-vue-next";
 import DirBrowser from "./DirBrowser.vue";
 import { deviceClient, message } from "../client/hub";
 import { network, notify, select } from "../client/store";
+import { t } from "../i18n";
 
 const props = defineProps<{ deviceId?: string }>();
 const emit = defineEmits<{ close: [] }>();
@@ -36,15 +37,15 @@ async function create() {
   error.value = "";
   try {
     const model = models.value.find((m) => key(m) === draft.value.model);
-    if (!model) throw Error("Choose a model");
+    if (!model) throw Error(t("newSession.chooseModel"));
     const created = await deviceClient(device.value.id).createSession({
-      name: draft.value.name.trim() || "New session",
+      name: draft.value.name.trim() || t("newSession.defaultName"),
       cwd: draft.value.cwd.trim(),
       model: { provider: model.provider, modelId: model.id },
     });
     const root = created.agents.find((a) => a.kind === "root") ?? created.agents[0];
     select({ deviceId: device.value.id, sessionId: created.id, agentId: root?.id ?? 1 });
-    notify(`Session created on ${device.value.id}.`);
+    notify(t("newSession.created", { device: device.value.id }));
     emit("close");
   } catch (e) {
     error.value = message(e);
@@ -59,42 +60,43 @@ async function create() {
     <form class="modal session-modal" @submit.prevent="create">
       <header>
         <div>
-          <span class="eyebrow">A PERSISTENT WORKSPACE</span>
-          <h2>New session</h2>
+          <span class="eyebrow">{{ t("newSession.eyebrow") }}</span>
+          <h2>{{ t("newSession.title") }}</h2>
         </div>
         <button
           type="button"
           class="icon-button"
-          aria-label="Close new session"
+          :aria-label="t('newSession.close')"
           @click="emit('close')"
         >
           <X :size="18" />
         </button>
       </header>
-      <p v-if="!devices.length" class="message-error">
-        No device is online. Start one with just backend run or just net up &lt;id&gt;, then try again.
-      </p>
+      <p v-if="!devices.length" class="message-error">{{ t("newSession.noDevice") }}</p>
       <template v-else>
         <label
-          >Device<select v-model="deviceId" aria-label="Device">
+          >{{ t("newSession.device")
+          }}<select v-model="deviceId" :aria-label="t('newSession.device')">
             <option v-for="d in devices" :key="d.id" :value="d.id">
               {{ d.id }} · {{ d.info?.hostname ?? d.url }}
             </option>
           </select></label
         >
         <label
-          >Session name<input
+          >{{ t("newSession.name")
+          }}<input
             v-model="draft.name"
             autofocus
-            placeholder="My durable agent"
+            :placeholder="t('newSession.namePlaceholder')"
             maxlength="100"
         /></label>
         <div class="field">
-          <span>Working directory on {{ deviceId }}</span>
+          <span>{{ t("newSession.workdir", { device: deviceId }) }}</span>
           <DirBrowser v-model="draft.cwd" :device-id="deviceId" />
         </div>
         <label
-          >Model<select v-model="draft.model" aria-label="New session model">
+          >{{ t("newSession.model")
+          }}<select v-model="draft.model" :aria-label="t('newSession.modelLabel')">
             <option v-for="m in models" :key="key(m)" :value="key(m)">
               {{ m.tier }} / {{ m.name }}
             </option>
@@ -103,9 +105,10 @@ async function create() {
       </template>
       <p v-if="error" class="message-error" role="alert">{{ error }}</p>
       <footer>
-        <button type="button" class="secondary" @click="emit('close')">Cancel</button
+        <button type="button" class="secondary" @click="emit('close')">
+          {{ t("common.cancel") }}</button
         ><button class="primary" :disabled="pending || !draft.model || !draft.cwd || !device">
-          <Plus :size="18" />{{ pending ? "Creating…" : "Create session" }}
+          <Plus :size="18" />{{ pending ? t("newSession.creating") : t("newSession.create") }}
         </button>
       </footer>
     </form>

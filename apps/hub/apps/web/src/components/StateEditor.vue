@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { Plus, Minus, Trash2 } from "lucide-vue-next";
 import { statePath, type JsonValue, type StateChange } from "@sdk/app-state";
+import { t } from "../i18n";
 
 const props = withDefaults(
   defineProps<{ value: JsonValue; path?: string; label?: string; disabled?: boolean }>(),
@@ -67,7 +68,7 @@ function add() {
       <strong>{{ label }}</strong>
       <select
         :value="kind"
-        :aria-label="`Type of ${path}`"
+        :aria-label="t('state.typeOf', { path })"
         :disabled="disabled"
         @change="change('update', defaults[($event.target as HTMLSelectElement).value]!())"
       >
@@ -75,8 +76,8 @@ function add() {
       </select>
       <button
         class="icon-button"
-        :aria-label="`Delete ${path}`"
-        title="Delete field"
+        :aria-label="t('state.deletePath', { path })"
+        :title="t('state.deleteField')"
         :disabled="disabled"
         @click="change('delete')"
       >
@@ -97,37 +98,39 @@ function add() {
         <input
           v-if="kind !== 'array'"
           v-model="key"
-          placeholder="Field name"
-          :aria-label="`New field name in ${path || '/'}`"
+          :placeholder="t('state.fieldName')"
+          :aria-label="t('state.newFieldName', { path: path || '/' })"
           required
           :disabled="disabled"
         />
         <select
           v-model="newType"
-          :aria-label="`New field type in ${path || '/'}`"
+          :aria-label="t('state.newFieldType', { path: path || '/' })"
           :disabled="disabled"
         >
           <option v-for="type in types" :key="type" :value="type">{{ type }}</option>
         </select>
         <button class="secondary small" :disabled="disabled || (kind !== 'array' && !key.trim())">
-          Add
+          {{ t("state.add") }}
         </button>
-        <button type="button" class="text-button" @click="adding = false">Cancel</button>
+        <button type="button" class="text-button" @click="adding = false">
+          {{ t("common.cancel") }}
+        </button>
       </form>
       <button
         v-else-if="kind === 'array'"
         class="text-button state-add-button"
         :disabled="disabled"
-        :aria-label="`Add ${kind === 'array' ? 'item' : 'field'} to ${path || '/'}`"
+        :aria-label="t('state.addItem')"
         @click="adding = true"
       >
-        <Plus :size="18" />{{ kind === "array" ? "Add item" : "Add field" }}
+        <Plus :size="18" />{{ t("state.addItem") }}
       </button>
     </template>
     <div v-else-if="kind === 'number'" class="state-number">
       <button
         class="secondary"
-        :aria-label="`Decrement ${path}`"
+        :aria-label="t('state.decrement', { path })"
         :disabled="disabled"
         @click="change('increment', -1)"
       >
@@ -137,7 +140,7 @@ function add() {
         v-model="draft"
         type="number"
         step="any"
-        :aria-label="`Value of ${path}`"
+        :aria-label="t('state.valueOf', { path })"
         :disabled="disabled"
         @focus="editing = true"
         @blur="save"
@@ -145,7 +148,7 @@ function add() {
       />
       <button
         class="secondary"
-        :aria-label="`Increment ${path}`"
+        :aria-label="t('state.increment', { path })"
         :disabled="disabled"
         @click="change('increment', 1)"
       >
@@ -156,7 +159,7 @@ function add() {
       <button
         class="switch"
         role="switch"
-        :aria-label="`Value of ${path}`"
+        :aria-label="t('state.valueOf', { path })"
         :aria-checked="value === true"
         :class="{ on: value === true }"
         :disabled="disabled"
@@ -169,7 +172,7 @@ function add() {
       v-else-if="kind === 'string'"
       v-model="draft"
       rows="2"
-      :aria-label="`Value of ${path}`"
+      :aria-label="t('state.valueOf', { path })"
       :disabled="disabled"
       @focus="editing = true"
       @blur="save"

@@ -12,6 +12,7 @@ import {
 } from "@earendil-works/pi-tui";
 import { agentTree, type TreeNode } from "../../sdk/src/models.ts";
 import type { App } from "./app.ts";
+import { t } from "./i18n.ts";
 import { c, selectTheme } from "./theme.ts";
 
 const panelBg = (s: string) => `\x1b[48;2;37;26;27m${s}\x1b[49m`;
@@ -34,7 +35,7 @@ export class Picker extends Box {
     items: SelectItem[],
     onPick: (item: SelectItem) => void,
     onCancel: () => void,
-    hint = "↑↓ move │ enter select │ type to filter │ esc close",
+    hint = t("picker.hint"),
   ) {
     super(1, 0, panelBg);
     this.title = new Title(c.bold(c.accent(label)));
@@ -72,7 +73,7 @@ export class Prompt extends Box implements Focusable {
     this.input.onSubmit = onSubmit;
     this.input.onEscape = onCancel;
     this.addChild(this.input);
-    this.addChild(new Title(c.muted("enter confirm │ esc cancel")));
+    this.addChild(new Title(c.muted(t("picker.promptHint"))));
   }
   handleInput(data: string) {
     this.input.handleInput(data);
@@ -100,15 +101,26 @@ export class Panel extends Box {
 export async function pickSession(app: App) {
   const tree = await app.client.tree();
   const items: SelectItem[] = [
-    { value: "+new", label: "＋ New session", description: `choose a directory on ${app.device.id}` },
-    ...tree.sessions.map((s) => ({
-      value: s.id,
-      label: s.name,
-      description: `${s.cwd.split("/").slice(-2).join("/")} │ ${s.agents.length} agent${s.agents.length === 1 ? "" : "s"}${s.busy ? " │ working" : ""}`,
-    })),
+    {
+      value: "+new",
+      label: t("picker.newSession"),
+      description: t("picker.newSessionDesc", { device: app.device.id }),
+    },
+    ...tree.sessions.map((s) => {
+      const cwd = s.cwd.split("/").slice(-2).join("/");
+      const meta = t(s.agents.length === 1 ? "picker.sessionMetaOne" : "picker.sessionMeta", {
+        cwd,
+        count: s.agents.length,
+      });
+      return {
+        value: s.id,
+        label: s.name,
+        description: `${meta}${s.busy ? ` │ ${t("picker.working")}` : ""}`,
+      };
+    }),
   ];
   app.overlay(
-    new Picker(`Sessions on ${app.device.id}`, items, (item) => {
+    new Picker(t("picker.sessions", { device: app.device.id }), items, (item) => {
       app.closeOverlay();
       if (item.value === "+new") return void newSession(app);
       const s = tree.sessions.find((x) => x.id === item.value)!;
@@ -119,16 +131,20 @@ export async function pickSession(app: App) {
 }
 
 export async function newSession(app: App) {
-  const name = await app.prompt("Session name", "");
+  const name = await app.prompt(t("picker.sessionName"), "");
   if (name === undefined) return app.sessionId ? undefined : pickSession(app);
   const cwd = await walkDirs(app, "");
   if (!cwd) return app.sessionId ? undefined : pickSession(app);
   const model = await chooseModel(app, app.info.defaultModel);
   if (!model) return;
   await app.run(async () => {
-    const s = await app.client.createSession({ name: name || "New session", cwd, model: { provider: model.provider, modelId: model.id } });
+    const s = await app.client.createSession({
+      name: name || t("picker.defaultSessionName"),
+      cwd,
+      model: { provider: model.provider, modelId: model.id },
+    });
     await app.attach(s.id, s.agents.find((a) => a.kind === "root")?.id ?? 1);
-    app.flash(`Session created in ${cwd}`);
+    app.flash(t("picker.sessionCreated", { path: cwd }));
   });
 }
 
@@ -138,12 +154,14 @@ function walkDirs(app: App, path: string): Promise<string | undefined> {
       const listing = await app.client.dirs(at).catch((e: Error) => (app.flash(e.message, true), undefined));
       if (!listing) return done(undefined);
       const items: SelectItem[] = [
-        ...(listing.path ? [{ value: `use:${listing.path}`, label: `✓ Use ${listing.path}` }] : []),
-        ...(listing.path ? [{ value: listing.parent ?? "", label: listing.parent ? ".." : "⌂ start dirs" }] : []),
+        ...(listing.path ? [{ value: `use:${listing.path}`, label: t("picker.use", { path: listing.path }) }] : []),
+        ...(listing.path
+          ? [{ value: listing.parent ?? "", label: listing.parent ? ".." : t("picker.startDirs") }]
+          : []),
         ...listing.dirs.map((d) => ({ value: d.path, label: `${d.name}/` })),
       ];
       app.overlay(
-        new Picker(`Working directory on ${app.device.id}`, items, (item) => {
+        new Picker(t("picker.workdir", { device: app.device.id }), items, (item) => {
           app.closeOverlay();
           if (item.value.startsWith("use:")) done(item.value.slice(4));
           else void step(item.value);
@@ -161,7 +179,7 @@ function chooseModel(app: App, current?: string) {
   return new Promise<(typeof app.info.models)[number] | undefined>((done) => {
     const models = app.info.models;
     const picker = new Picker(
-      `Model (${app.device.id})`,
+      t("picker.model", { device: app.device.id }),
       models.map((m) => ({ value: `${m.provider}/${m.id}`, label: m.name, description: `${m.tier} │ ${m.provider}` })),
       (item) => {
         app.closeOverlay();
@@ -184,9 +202,19 @@ export async function pickModel(app: App) {
   if (!model) return;
   await app.run(async () => {
     await app.handle!.configure({ model: { provider: model.provider, modelId: model.id } });
-    app.flash(`Model: ${model.name} (next turn)`);
+    app.flash(t("picker.modelSet", { name: model.name }));
   });
 }
+
+/** Root, fork and subagent, in the language the rest of the picker is in. */
+const kindName = (kind: string) =>
+  kind === "fork"
+    ? t("picker.kind.fork")
+    : kind === "subagent"
+      ? t("picker.kind.subagent")
+      : kind === "root"
+        ? t("picker.kind.root")
+        : kind;
 
 export function pickAgent(app: App) {
   const summary = app.sessionSummary();
@@ -200,7 +228,10 @@ export function pickAgent(app: App) {
       rows.push({
         value: String(a.id),
         label: `${"  ".repeat(depth)}${icon} ${a.name}${a.busy ? " ●" : ""}`,
-        description: [a.kind === "fork" ? `fork @ #${a.forkedAt}` : a.kind, a.background ? `${a.background} bg` : ""]
+        description: [
+          a.kind === "fork" ? t("picker.forkAt", { entry: a.forkedAt ?? "?" }) : kindName(a.kind),
+          a.background ? t("picker.agentBg", { count: a.background }) : "",
+        ]
           .filter(Boolean)
           .join(" │ "),
       });
@@ -208,7 +239,7 @@ export function pickAgent(app: App) {
     }
   };
   walk(agentTree(app.device.id, summary, false), 0);
-  const picker = new Picker(`Agents in ${summary.name}`, rows, (item) => {
+  const picker = new Picker(t("picker.agents", { name: summary.name }), rows, (item) => {
     app.closeOverlay();
     void app.attach(summary.id, Number(item.value));
   }, () => app.closeOverlay());
@@ -219,14 +250,14 @@ export function pickAgent(app: App) {
 
 export function pickDevice(app: App) {
   const devices = app.registry?.list() ?? [];
-  if (!devices.length) return app.flash("No saved devices. Use --url/--token --save <id>.", true);
+  if (!devices.length) return app.flash(t("picker.noDevices"), true);
   app.overlay(
     new Picker(
-      "Devices",
+      t("picker.devices"),
       devices.map((d) => ({
         value: d.id,
         label: `${d.id === app.device.id ? "● " : "  "}${d.id}`,
-        description: `${d.kind} │ ${d.url}${d.token ? "" : " │ no token"}`,
+        description: `${d.kind} │ ${d.url}${d.token ? "" : ` │ ${t("picker.noToken")}`}`,
       })),
       (item) => {
         app.closeOverlay();

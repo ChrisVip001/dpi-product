@@ -13,42 +13,78 @@ import {
   Wrench,
 } from "lucide-vue-next";
 import type { TaskNode, TaskOutcome } from "@sdk/api";
-import { jobRunDone } from "@sdk/jobs";
+import { jobRunDone, type JobRun } from "@sdk/jobs";
 import { message } from "../client/hub";
 import { agentHandle, sessionHandle, tasks } from "../client/store";
 import { decide, jobDef, jobDefs, jobRuns, openAgent, pending, revealRun, startJob } from "../client/jobs";
+import { inputHelp, jobSummary, jobTitle, phaseLabel } from "../client/jobText";
+import { t, type Key } from "../i18n";
 
 const error = ref("");
 const stopping = ref(false);
 const recent = ref<TaskOutcome[]>([]);
 const inspection = ref<unknown>();
 
-const status = (value: string) =>
-  ({
-    running: "Running",
-    waiting: "Waiting",
-    completed: "Completed",
-    aborted: "Stopped",
-    declined: "Declined",
-    failed: "Failed",
-    pending: "Queued",
-    completing: "Finishing",
-    terminal: "Finished",
-  })[value] ?? value;
+const STATUS_KEYS: Record<string, Key> = {
+  running: "taskStatus.running",
+  waiting: "taskStatus.waiting",
+  completed: "taskStatus.completed",
+  aborted: "taskStatus.aborted",
+  declined: "taskStatus.declined",
+  failed: "taskStatus.failed",
+  pending: "taskStatus.pending",
+  completing: "taskStatus.completing",
+  terminal: "taskStatus.terminal",
+};
+const status = (value: string) => {
+  const key = STATUS_KEYS[value];
+  return key ? t(key) : value;
+};
 
 /** The newest run of each job, for its row in the list. */
 const latest = computed(() => new Map(jobDefs.value.map((d) => [d.id, jobRuns.value.find((r) => r.job === d.id)])));
+
+/** The device describes its jobs in English; this list shows them in the reader's language. */
+const jobs = computed(() =>
+  jobDefs.value.map((def) => ({
+    def,
+    title: jobTitle(def.id, def.title),
+    summary: jobSummary(def.id, def.summary),
+    phases: def.phases.map((phase) => ({
+      ...phase,
+      label: phaseLabel(def.id, phase.id, phase.label),
+    })),
+    inputs: def.inputs.map((input) => ({
+      ...input,
+      description: inputHelp(def.id, input.name, input.description),
+    })),
+  })),
+);
+
+/** The phase a run is sitting in, named in the reader's language. */
+const runPhaseLabel = (run: JobRun) => {
+  const phase = run.phases.find((p) => p.id === run.phase);
+  return phase ? phaseLabel(run.job, phase.id, phase.label) : "";
+};
+
+/** The device labels a job task "Change watch #3": translate the job name, keep the run number. */
+const jobTaskName = (job: string, label?: string) => {
+  const def = jobDef(job);
+  const title = jobTitle(job, def?.title ?? label ?? job);
+  const run = def && label?.startsWith(def.title) ? label.slice(def.title.length).trim() : "";
+  return /^#\d+$/.test(run) ? `${title} ${run}` : title;
+};
 
 // ------------------------------------------------------------------ the live task tree
 
 type Row = { task: TaskNode & { effectiveBackground: boolean }; depth: number };
 const rows = computed<Row[]>(() => {
   const all = tasks.value;
-  const ids = new Set(all.map((t) => t.id));
+  const ids = new Set(all.map((task) => task.id));
   const children = new Map<number | undefined, typeof all>();
-  for (const t of all) {
-    const parent = t.owner !== undefined && ids.has(t.owner) ? t.owner : undefined;
-    children.set(parent, [...(children.get(parent) ?? []), t]);
+  for (const task of all) {
+    const parent = task.owner !== undefined && ids.has(task.owner) ? task.owner : undefined;
+    children.set(parent, [...(children.get(parent) ?? []), task]);
   }
   const out: Row[] = [];
   const walk = (parent: number | undefined, depth: number) => {
@@ -60,23 +96,34 @@ const rows = computed<Row[]>(() => {
   walk(undefined, 0);
   return out;
 });
-const kindOf = (t: TaskNode) =>
-  t.kind === "pi.tool"
-    ? { icon: Wrench, name: t.label ?? "Tool call", what: "tool call" }
-    : t.kind === "pi.generation"
-      ? { icon: Bot, name: "Model response", what: "generation" }
-      : t.kind === "pi.compaction"
-        ? { icon: Layers, name: "Compaction", what: "compaction" }
-        : t.kind.startsWith("demo.job.")
-          ? { icon: Workflow, name: t.label ?? jobDef(t.kind.slice(9))?.title ?? t.kind, what: "durable job" }
-          : t.kind === "demo.job-approval"
-            ? { icon: ShieldCheck, name: "Approval", what: "waits for you" }
-            : { icon: Activity, name: t.label ?? t.kind, what: t.kind };
-const phaseOf = (t: TaskNode) => {
-  if (!t.state.phase) return "";
-  if (t.kind.startsWith("demo.job."))
-    return jobDef(t.kind.slice(9))?.phases.find((p) => p.id === t.state.phase)?.label ?? t.state.phase;
-  return t.state.phase;
+const kindOf = (task: TaskNode): { icon: unknown; name: string; what: string } =>
+  task.kind === "pi.tool"
+    ? {
+        icon: Wrench,
+        name: task.label ?? t("taskKind.tool"),
+        what: t("taskKind.toolWhat"),
+      }
+    : task.kind === "pi.generation"
+      ? { icon: Bot, name: t("taskKind.generation"), what: t("taskKind.generationWhat") }
+      : task.kind === "pi.compaction"
+        ? { icon: Layers, name: t("taskKind.compaction"), what: t("taskKind.compactionWhat") }
+        : task.kind.startsWith("demo.job.")
+          ? {
+              icon: Workflow,
+              name: jobTaskName(task.kind.slice(9), task.label),
+              what: t("taskKind.jobWhat"),
+            }
+          : task.kind === "demo.job-approval"
+            ? { icon: ShieldCheck, name: t("taskKind.approval"), what: t("taskKind.approvalWhat") }
+            : { icon: Activity, name: task.label ?? task.kind, what: task.kind };
+const phaseOf = (task: TaskNode) => {
+  if (!task.state.phase) return "";
+  if (task.kind.startsWith("demo.job.")) {
+    const job = jobDef(task.kind.slice(9));
+    const phase = job?.phases.find((p) => p.id === task.state.phase);
+    return phase ? phaseLabel(task.kind.slice(9), phase.id, phase.label) : task.state.phase;
+  }
+  return task.state.phase;
 };
 
 async function stopAll() {
@@ -115,29 +162,25 @@ const outcomes = computed(() =>
 <template>
   <div class="tasks-panel">
     <div class="panel-heading">
-      <h2>Tasks</h2>
-      <span class="tag">{{ tasks.length }} active</span>
+      <h2>{{ t("tasks.title") }}</h2>
+      <span class="tag">{{ t("tasks.active", { count: tasks.length }) }}</span>
     </div>
     <p v-if="error" class="message-error" role="alert">{{ error }}</p>
 
-    <section class="task-section" aria-label="Durable jobs">
-      <h3><Repeat :size="18" />Durable jobs</h3>
-      <p class="hint">
-        Repeatable workflows with named phases. Every run follows the same phases and saves a checkpoint after each one.
-        Start one here, or ask your agent: it finds these with <code>list_durable_jobs</code>, starts them with
-        <code>run_durable_job</code> and checks them with <code>check_durable_job</code>. Runs play out live in the chat.
-      </p>
-      <p v-if="!jobDefs.length" class="task-empty">This device has no durable jobs. Deploy the latest backend to it.</p>
-      <article v-for="def in jobDefs" :key="def.id" class="job-def" :data-job="def.id">
+    <section class="task-section" :aria-label="t('tasks.jobsSection')">
+      <h3><Repeat :size="18" />{{ t("tasks.jobsSection") }}</h3>
+      <p class="hint">{{ t("tasks.jobsHint") }}</p>
+      <p v-if="!jobDefs.length" class="task-empty">{{ t("tasks.noJobs") }}</p>
+      <article v-for="job in jobs" :key="job.def.id" class="job-def" :data-job="job.def.id">
         <div class="job-def-head">
           <Workflow :size="18" />
-          <strong>{{ def.title }}</strong>
-          <span v-if="def.approval" class="tag">needs approval</span>
-          <span class="tag">~{{ def.seconds }}s</span>
+          <strong>{{ job.title }}</strong>
+          <span v-if="job.def.approval" class="tag">{{ t("tasks.needsApproval") }}</span>
+          <span class="tag">{{ t("tasks.duration", { seconds: job.def.seconds }) }}</span>
         </div>
-        <p>{{ def.summary }}</p>
-        <ol class="job-chain" :aria-label="`${def.title} phases`">
-          <li v-for="(phase, i) in def.phases" :key="phase.id" :title="phase.summary">
+        <p>{{ job.summary }}</p>
+        <ol class="job-chain" :aria-label="t('tasks.phasesLabel', { title: job.title })">
+          <li v-for="(phase, i) in job.phases" :key="phase.id" :title="phase.summary">
             <span>{{ i + 1 }}</span>{{ phase.label }}<Repeat v-if="phase.kind === 'repeat'" :size="13" /><ShieldCheck
               v-if="phase.kind === 'approval'"
               :size="13"
@@ -145,39 +188,45 @@ const outcomes = computed(() =>
           </li>
         </ol>
         <div class="job-def-meta">
-          <code v-for="input in def.inputs" :key="input.name" :title="input.description">{{ input.name }}={{ input.default }}</code>
-          <code :title="`Each run saves its result to App State ${def.resultPath}`">→ {{ def.resultPath }}</code>
+          <code v-for="input in job.inputs" :key="input.name" :title="input.description">{{ input.name }}={{ input.default }}</code>
+          <code :title="t('tasks.resultPathTitle', { path: job.def.resultPath })">→ {{ job.def.resultPath }}</code>
         </div>
-        <div v-if="latest.get(def.id)" class="job-def-last">
+        <div v-if="latest.get(job.def.id)" class="job-def-last">
           <span
-            >Run #{{ latest.get(def.id)!.run }}:
-            <strong>{{ status(latest.get(def.id)!.status) }}</strong
-            ><template v-if="!jobRunDone(latest.get(def.id)!)">
-              in {{ latest.get(def.id)!.phases.find((p) => p.id === latest.get(def.id)!.phase)?.label }}</template
+            >{{ t("tasks.lastRun", { run: latest.get(job.def.id)!.run }) }}
+            <strong>{{ status(latest.get(job.def.id)!.status) }}</strong
+            ><template v-if="!jobRunDone(latest.get(job.def.id)!)">
+              {{
+                t("tasks.lastRunIn", {
+                  phase: runPhaseLabel(latest.get(job.def.id)!),
+                })
+              }}</template
             ></span
           >
-          <button class="text-button" @click="revealRun(latest.get(def.id)!.id)">Show in chat</button>
-          <template v-if="latest.get(def.id)!.approval === 'pending'">
-            <button class="primary small" :disabled="!!pending" @click="decide(latest.get(def.id)!, true)">Approve</button>
-            <button class="secondary" :disabled="!!pending" @click="decide(latest.get(def.id)!, false)">Decline</button>
+          <button class="text-button" @click="revealRun(latest.get(job.def.id)!.id)">
+            {{ t("tasks.showInChat") }}</button
+          >
+          <template v-if="latest.get(job.def.id)!.approval === 'pending'">
+            <button class="primary small" :disabled="!!pending" @click="decide(latest.get(job.def.id)!, true)">
+              {{ t("tasks.approve") }}</button
+            ><button class="secondary" :disabled="!!pending" @click="decide(latest.get(job.def.id)!, false)">
+              {{ t("tasks.decline") }}
+            </button>
           </template>
         </div>
-        <button class="secondary job-def-run" :disabled="!!pending || !agentHandle" @click="startJob(def)">
-          <Play :size="16" />Run {{ def.title }}
+        <button class="secondary job-def-run" :disabled="!!pending || !agentHandle" @click="startJob(job.def)">
+          <Play :size="16" />{{ t("tasks.run", { title: job.title }) }}
         </button>
       </article>
     </section>
 
-    <section class="task-section" aria-label="Agent activity">
+    <section class="task-section" :aria-label="t('tasks.activitySection')">
       <div class="panel-heading">
-        <h3>Agent activity</h3>
+        <h3>{{ t("tasks.activitySection") }}</h3>
         <Activity :size="18" />
       </div>
-      <p class="hint">
-        Every model response and every tool call is its own durable task with an id, an owner and a checkpoint. Follow
-        them live here; after a restart each one resumes or reports how it ended.
-      </p>
-      <p v-if="!rows.length" class="task-empty">Nothing running. Send a message or run a job.</p>
+      <p class="hint">{{ t("tasks.activityHint") }}</p>
+      <p v-if="!rows.length" class="task-empty">{{ t("tasks.nothingRunning") }}</p>
       <ul v-else class="task-tree">
         <li
           v-for="{ task, depth } in rows"
@@ -190,24 +239,27 @@ const outcomes = computed(() =>
           <strong>{{ kindOf(task).name }}</strong>
           <span class="tag">{{ status(task.state.status) }}</span>
           <span v-if="phaseOf(task)" class="task-phase">{{ phaseOf(task) }}</span>
-          <small
-            >#{{ task.id }} {{ kindOf(task).what }}, agent #{{ task.conversationId
-            }}{{ task.effectiveBackground ? ", background" : "" }}</small
-          >
+          <small>{{
+            t(task.effectiveBackground ? "tasks.taskMetaBackground" : "tasks.taskMeta", {
+              id: task.id,
+              what: kindOf(task).what,
+              agent: task.conversationId,
+            })
+          }}</small>
           <button v-for="cid in task.conversations" :key="cid" class="text-button" @click="openAgent(cid)">
-            Open agent #{{ cid }}
+            {{ t("tasks.openAgent", { id: cid }) }}
           </button>
         </li>
       </ul>
-      <p class="hint">Interrupt or Esc stops foreground work and what it owns. Stop all also stops background runs.</p>
+      <p class="hint">{{ t("tasks.interruptHint") }}</p>
       <button class="secondary danger" :disabled="!tasks.length || stopping" @click="stopAll">
-        <Octagon :size="18" />Stop all
+        <Octagon :size="18" />{{ t("tasks.stopAll") }}
       </button>
     </section>
 
     <details class="raw task-section" @toggle="loadRuntime">
-      <summary><Clock3 :size="18" />Runtime details</summary>
-      <p class="hint">Recent task results and recovery records, read from the device when opened.</p>
+      <summary><Clock3 :size="18" />{{ t("tasks.runtime") }}</summary>
+      <p class="hint">{{ t("tasks.runtimeHint") }}</p>
       <details v-for="task in outcomes" :key="task.id" class="raw">
         <summary>
           {{ task.kind }} #{{ task.id }}<span>{{ status(task.state.outcome?.status ?? task.state.status) }}</span>
@@ -215,7 +267,7 @@ const outcomes = computed(() =>
         <pre>{{ JSON.stringify(task.state.outcome, null, 2) }}</pre>
       </details>
       <details class="raw">
-        <summary>Recovery inspection</summary>
+        <summary>{{ t("tasks.recovery") }}</summary>
         <pre>{{ JSON.stringify(inspection, null, 2) }}</pre>
       </details>
     </details>

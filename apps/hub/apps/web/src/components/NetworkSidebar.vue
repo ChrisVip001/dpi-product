@@ -5,6 +5,7 @@ import DeviceIcon from "./DeviceIcon.vue";
 import type { TreeNode } from "@sdk/models";
 import TreeRow from "./TreeRow.vue";
 import { deviceClient, hub } from "../client/hub";
+import { deviceStatus, t } from "../i18n";
 import {
   attempt,
   expanded,
@@ -75,23 +76,23 @@ async function action(node: TreeNode, name: string) {
       const created = await attempt(() => client.session(s.id).createAgent({}));
       if (created) {
         select({ deviceId: device.id, sessionId: s.id, agentId: created.id });
-        notify("New agent. Same session, same shared App State.");
+        notify(t("topbar.newAgentToast"));
       }
     } else if (name === "rename")
       ui.dialog = {
         kind: "prompt",
-        title: "Rename session",
-        label: "Session name",
+        title: t("dialog.renameSession.title"),
+        label: t("dialog.sessionName.label"),
         value: s.name,
-        submit: "Save name",
+        submit: t("dialog.saveName"),
         run: (value) => client.session(s.id).rename(value),
       };
     else if (name === "archive")
       ui.dialog = {
         kind: "prompt",
-        title: `Archive ${s.name}?`,
-        hint: `Stops all of its work and moves its files to archive/ on ${device.id}. Nothing is deleted.`,
-        submit: "Archive session",
+        title: t("dialog.archive.title", { name: s.name }),
+        hint: t("dialog.archive.hint", { device: device.id }),
+        submit: t("dialog.archive.submit"),
         danger: true,
         run: async () => {
           await client.session(s.id).archive();
@@ -104,11 +105,11 @@ async function action(node: TreeNode, name: string) {
   if (name === "rename")
     ui.dialog = {
       kind: "prompt",
-      title: "Rename agent",
-      label: "Agent name",
+      title: t("dialog.renameAgent.title"),
+      label: t("dialog.agentName.label"),
       value: a.named ? a.name : "",
       placeholder: a.name,
-      submit: "Save name",
+      submit: t("dialog.saveName"),
       run: (value) => client.agent(node.sessionId, a.id).rename(value),
     };
 }
@@ -150,15 +151,15 @@ function keydown(e: KeyboardEvent) {
   <aside
     class="network-sidebar"
     :class="{ open: ui.drawer, collapsed: !layout.tree && !ui.drawer }"
-    aria-label="Network"
+    :aria-label="t('topbar.networkTitle')"
   >
     <template v-if="layout.tree || ui.drawer">
       <header class="tree-head">
-        <span><Network :size="16" />NETWORK</span>
+        <span><Network :size="16" />{{ t("sidebar.network") }}</span>
         <button
           class="icon-button panel-toggle"
-          aria-label="Collapse network"
-          :title="`Collapse network (${panelKeys.tree})`"
+          :aria-label="t('sidebar.collapse')"
+          :title="t('sidebar.collapseTitle', { key: panelKeys.tree })"
           @click="((layout.tree = false), (ui.drawer = false))"
         >
           <PanelLeftClose :size="18" />
@@ -169,7 +170,7 @@ function keydown(e: KeyboardEvent) {
         class="tree-list"
         role="tree"
         tabindex="0"
-        aria-label="Devices, sessions and agents"
+        :aria-label="t('sidebar.treeLabel')"
         @keydown="keydown"
         @focus="focusFirst"
       >
@@ -187,16 +188,17 @@ function keydown(e: KeyboardEvent) {
           @action="action(row.node, $event)"
         />
         <p v-if="!rows.length" class="hint tree-empty">
-          No devices yet. Declare them in <code>dpi-network.yaml</code> (start from
-          <code>dpi-network.example.yaml</code>), then run <code>just net up &lt;id&gt;</code>.
+          {{ t("sidebar.empty1") }} <code>dpi-network.yaml</code> {{ t("sidebar.empty2") }}
+          <code>dpi-network.example.yaml</code>{{ t("sidebar.empty3") }}
+          <code>just net up &lt;id&gt;</code>{{ t("sidebar.empty4") }}
         </p>
       </div>
     </template>
-    <div v-else class="panel-rail" aria-label="Network (collapsed)">
+    <div v-else class="panel-rail" :aria-label="t('sidebar.railLabel')">
       <button
         class="icon-button panel-toggle"
-        aria-label="Expand network"
-        :title="`Expand network (${panelKeys.tree})`"
+        :aria-label="t('sidebar.expand')"
+        :title="t('sidebar.expandTitle', { key: panelKeys.tree })"
         @click="layout.tree = true"
       >
         <PanelLeftOpen :size="18" />
@@ -205,8 +207,8 @@ function keydown(e: KeyboardEvent) {
         v-for="d in network.devices.value"
         :key="d.id"
         class="rail-device"
-        :title="`${d.id} · ${d.status}`"
-        :aria-label="`Show ${d.id}`"
+        :title="`${d.id} · ${deviceStatus(d.status)}`"
+        :aria-label="t('sidebar.showDevice', { id: d.id })"
         @click="((layout.tree = true), toggle(d.id, true))"
       >
         <DeviceIcon :device="d" :size="20" /><i

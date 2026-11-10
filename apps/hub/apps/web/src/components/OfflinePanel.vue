@@ -4,6 +4,7 @@ import { Copy, RefreshCw, ShieldAlert, WifiOff, Loader } from "lucide-vue-next";
 import type { NetworkDevice } from "@sdk/api";
 import { hub, message } from "../client/hub";
 import { ago, notify } from "../client/store";
+import { t } from "../i18n";
 
 const props = defineProps<{ device: NetworkDevice }>();
 const busy = ref(false);
@@ -16,15 +17,15 @@ const fix = computed(() => {
   switch (d.status) {
     case "checking":
       return {
-        title: `Checking ${d.id}…`,
-        text: "Probing the device. This view fills in as soon as it answers.",
+        title: t("offline.checkingTitle", { id: d.id }),
+        text: t("offline.checkingText"),
       };
     case "unauthorized":
       return {
-        title: d.hasToken ? `${d.id} rejected its token` : `No token for ${d.id}`,
-        text: d.hasToken
-          ? "The device's DPI_TOKEN changed (a rotate or a rebuilt device). Copy the current token into this hub's registry, then check again."
-          : "This hub has no token for the device yet. Register it, then check again.",
+        title: d.hasToken
+          ? t("offline.rejectedTokenTitle", { id: d.id })
+          : t("offline.noTokenTitle", { id: d.id }),
+        text: d.hasToken ? t("offline.rejectedTokenText") : t("offline.noTokenText"),
         command:
           config && d.kind !== "url"
             ? `just net register ${d.id}`
@@ -32,8 +33,8 @@ const fix = computed(() => {
       };
     case "mismatch":
       return {
-        title: `${d.id} answers as a different device`,
-        text: "The URL now reaches a backend with another identity (a rebuilt VM or a new data directory). If that is expected, register it again: that trusts the identity it answers with now.",
+        title: t("offline.mismatchTitle", { id: d.id }),
+        text: t("offline.mismatchText"),
         command:
           d.kind === "url"
             ? `just net register ${d.id} --token <token>`
@@ -41,14 +42,14 @@ const fix = computed(() => {
       };
     case "incompatible":
       return {
-        title: `${d.id} speaks another API version`,
-        text: "Update the device's backend.",
+        title: t("offline.incompatibleTitle", { id: d.id }),
+        text: t("offline.incompatibleText"),
         command: config ? `just net deploy ${d.id}` : undefined,
       };
     default:
       return {
-        title: `${d.id} is offline`,
-        text: `Last seen ${ago(d.lastSeenAt)}. Its agents keep their state on the device and resume when its backend starts again. The tree shows the last known sessions.`,
+        title: t("offline.offlineTitle", { id: d.id }),
+        text: t("offline.offlineText", { ago: ago(d.lastSeenAt) }),
         command: !config
           ? undefined
           : d.kind === "local"
@@ -66,7 +67,7 @@ async function check() {
   error.value = "";
   try {
     const d = await hub.check(props.device.id);
-    if (d.status === "online") notify(`${d.id} is online.`);
+    if (d.status === "online") notify(t("offline.onlineToast", { id: d.id }));
   } catch (e) {
     error.value = message(e);
   } finally {
@@ -76,9 +77,9 @@ async function check() {
 async function copy(text: string) {
   try {
     await navigator.clipboard.writeText(text);
-    notify("Copied.");
+    notify(t("common.copied"));
   } catch {
-    notify("Clipboard needs localhost or HTTPS. Select the text to copy.");
+    notify(t("common.copyFailed"));
   }
 }
 </script>
@@ -98,17 +99,17 @@ async function copy(text: string) {
       <p v-if="device.error" class="hint offline-error">{{ device.error }}</p>
       <div v-if="fix.command" class="offline-command">
         <code>{{ fix.command }}</code>
-        <button class="icon-button" aria-label="Copy command" @click="copy(fix.command)">
+        <button class="icon-button" :aria-label="t('common.copyCommand')" @click="copy(fix.command)">
           <Copy :size="18" />
         </button>
       </div>
-      <p v-if="fix.command" class="hint">Run it in this repo's terminal, then press Check now.</p>
+      <p v-if="fix.command" class="hint">{{ t("offline.runHint") }}</p>
       <p v-if="fix.alt" class="hint">
-        Never deployed or rebuilt? <code>{{ fix.alt }}</code> provisions it from scratch.
+        {{ t("offline.altBefore") }} <code>{{ fix.alt }}</code> {{ t("offline.altAfter") }}
       </p>
       <div class="offline-actions">
         <button class="secondary" :disabled="busy" @click="check()">
-          <RefreshCw :size="18" />{{ busy ? "Checking…" : "Check now" }}
+          <RefreshCw :size="18" />{{ busy ? t("common.checking") : t("offline.checkNow") }}
         </button>
       </div>
       <p v-if="error" class="message-error" role="alert">{{ error }}</p>

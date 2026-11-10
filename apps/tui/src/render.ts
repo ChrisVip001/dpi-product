@@ -1,4 +1,4 @@
-// Transcript items (from the SDK, same as the web client) → pi-tui components, cached by item id.
+// Transcript items (from the SDK, same as the web client) → terminal components, cached by item id.
 // Only items whose content changed are rebuilt; the live assistant reuses its Markdown blocks.
 import {
   Container,
@@ -8,6 +8,7 @@ import {
   type Component,
 } from "@earendil-works/pi-tui";
 import type { ToolCallView, TranscriptItem } from "../../sdk/src/transcript.ts";
+import { t } from "./i18n.ts";
 import { c, markdownTheme } from "./theme.ts";
 
 const SPIN = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -70,7 +71,11 @@ export class ToolRow implements Component {
       : shown;
     const out = [head, ...lines.map((l) => truncateToWidth(gutter + (s === "error" ? c.err(l) : l), width))];
     if (all.length > shown.length)
-      out.splice(1, 0, truncateToWidth(c.muted(`  │ … ${all.length - shown.length} earlier lines (ctrl+o)`), width));
+      out.splice(
+        1,
+        0,
+        truncateToWidth(c.muted(t("render.earlierLines", { count: all.length - shown.length })), width),
+      );
     return out;
   }
   invalidate() {}

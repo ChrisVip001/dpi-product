@@ -1,4 +1,4 @@
-// tui: a pi-like terminal client for one Durable Agent Network device.
+// tui: a terminal client for one DPI device.
 //   tui <device>[:<session>[:<agent>]]        device from ~/.dpi/network.sqlite (seeded from dpi-network.yaml)
 //   tui --url <url> --token <token> [--save <id>]
 //   tui mac-mini --new triage                 create a session (in the device's first start dir) and attach
@@ -8,17 +8,9 @@ import { isDpiError } from "../../sdk/src/errors.ts";
 import { NetworkRegistry } from "../../sdk/src/node/registry.ts";
 import { syncConfigToRegistry, tryLoadNetworkConfig } from "../../sdk/src/node/config.ts";
 import { App, type DeviceRef } from "./app.ts";
+import { t } from "./i18n.ts";
 
-const USAGE = `usage: tui <device>[:<session>[:<agent>]] [options]
-       tui --url <url> --token <token> [--save <id>]
-
-  -s, --session <ref>   session id or name (else a picker opens)
-  -a, --agent <ref>     agent id, "main" or name (default: the session's root agent)
-  --new <name>          create a session on the device and attach
-  --cwd <dir>           working directory on the device for --new (absolute, or relative to its first start dir)
-  --model <id>          model for --new (default: the device's default)
-  --url, --token        connect to any backend directly (also DPI_URL, DPI_TOKEN)
-  --save <id>           store a --url device in ~/.dpi/network.sqlite under <id>`;
+const USAGE = t("main.usage");
 
 function fail(message: string): never {
   process.stderr.write(`${message}\n`);
@@ -56,14 +48,16 @@ const [deviceRef = "", sessionRef = values.session, agentRef = values.agent] = (
 let device: DeviceRef;
 if (url) {
   const token = values.token ?? process.env.DPI_TOKEN ?? "";
-  if (!token) fail("--url needs --token (or DPI_TOKEN)");
+  if (!token) fail(t("main.needToken"));
   device = { id: values.save ?? "adhoc", name: values.save ?? new URL(url).host, url: url.replace(/\/+$/, ""), token };
 } else {
   const known = registry.list().map((d) => d.id);
-  if (!deviceRef) fail(`${USAGE}\n\nKnown devices: ${known.join(", ") || "none"}`);
+  if (!deviceRef)
+    fail(t("main.noDevice", { usage: USAGE, devices: known.join(", ") || t("main.none") }));
   const row = registry.get(deviceRef);
-  if (!row) fail(`Unknown device "${deviceRef}". Known: ${known.join(", ") || "none (add one to dpi-network.yaml)"}`);
-  if (!row.token) fail(`No token for ${row.id}. Run: just net register ${row.id}`);
+  if (!row)
+    fail(t("main.unknownDevice", { id: deviceRef, devices: known.join(", ") || t("main.noneKnown") }));
+  if (!row.token) fail(t("main.noToken", { id: row.id }));
   device = { id: row.id, name: row.name, url: row.url, token: row.token };
 }
 
@@ -71,8 +65,8 @@ const client = new DpiClient(device.url, device.token);
 const info = await client.device({ timeoutMs: 8000 }).catch((e: unknown) =>
   fail(
     isDpiError(e) && e.code === "unauthorized"
-      ? `${device.id}: token rejected by ${device.url}`
-      : `${device.id} is offline at ${device.url} (${(e as Error).message})`,
+      ? t("main.tokenRejected", { id: device.id, url: device.url })
+      : t("main.offline", { id: device.id, url: device.url, message: (e as Error).message }),
   ),
 );
 if (values.save && url)
@@ -81,13 +75,14 @@ if (values.save && url)
 let session = sessionRef;
 if (values.new) {
   const cwd = values.cwd ?? (await client.dirs("")).dirs[0]?.path;
-  if (!cwd) fail(`${device.id} has no start dirs; pass --cwd`);
+  if (!cwd) fail(t("main.noStartDirs", { id: device.id }));
   const modelId = values.model ?? info.defaultModel;
   const model = info.models.find((m) => m.id === modelId);
-  if (!model) fail(`Unknown model ${modelId}. Available: ${info.models.map((m) => m.id).join(", ")}`);
+  if (!model)
+    fail(t("main.unknownModel", { id: modelId, models: info.models.map((m) => m.id).join(", ") }));
   const created = await client
     .createSession({ name: values.new, cwd, model: { provider: model.provider, modelId: model.id } })
-    .catch((e: Error) => fail(`Could not create the session: ${e.message}`));
+    .catch((e: Error) => fail(t("main.createFailed", { message: e.message })));
   session = created.id;
 }
 

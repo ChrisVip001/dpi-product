@@ -26,6 +26,7 @@ import {
 } from "../../sdk/src/api.ts";
 import type { NetworkRegistry } from "../../sdk/src/node/registry.ts";
 import { COMMANDS, runCommand } from "./commands.ts";
+import { t } from "./i18n.ts";
 import { pickModel, pickSession, Prompt } from "./pickers.ts";
 import { Line, spinner, TranscriptView } from "./render.ts";
 import { c, editorTheme } from "./theme.ts";
@@ -45,7 +46,7 @@ const compact = (n: number) => Intl.NumberFormat("en", { notation: "compact", ma
 
 export class App {
   readonly tui = new TuiAltScreen(new ProcessTerminal(), false, undefined, {
-    scrollToEndIndicator: () => c.muted(" ↓ new output "),
+    scrollToEndIndicator: () => c.muted(t("app.newOutput")),
   });
   readonly model = new AgentModel();
   readonly session = new SessionModel();
@@ -135,7 +136,7 @@ export class App {
 
   async switchDevice(id: string) {
     const row = this.registry?.get(id);
-    if (!row?.token) return this.flash(`No token for ${id}. Run: just net register ${id}`, true);
+    if (!row?.token) return this.flash(t("app.noToken", { id }), true);
     const client = new DpiClient(row.url, row.token);
     await this.run(async () => {
       this.info = await client.device({ timeoutMs: 8000 });
@@ -203,14 +204,14 @@ export class App {
     const content = text.trim();
     if (!content) return;
     if (content.startsWith("/") && (await runCommand(this, content))) return;
-    if (!this.handle) return this.flash("Pick a session first (/sessions).", true);
+    if (!this.handle) return this.flash(t("app.pickSessionFirst"), true);
     // The same requestId on every retry: the device admits the message exactly once.
     const requestId = newId();
     for (let attempt = 1; ; attempt++) {
       try {
         await this.handle.send(content, whenBusy, requestId);
         this.editor.addToHistory(content);
-        if (whenBusy === "steer") this.flash("Steering: joins after the current tool round");
+        if (whenBusy === "steer") this.flash(t("app.steering"));
         return;
       } catch (e) {
         if (isDpiError(e) && e.code === "offline" && attempt < 3) {
@@ -218,7 +219,7 @@ export class App {
           continue;
         }
         if (!this.editor.getText()) this.editor.setText(text);
-        this.flash(isDpiError(e) && e.code === "busy" ? "Agent is busy (reject mode)" : (e as Error).message, true);
+        this.flash(isDpiError(e) && e.code === "busy" ? t("app.busyReject") : (e as Error).message, true);
         return;
       }
     }
@@ -227,7 +228,7 @@ export class App {
   private async interrupt() {
     await this.run(async () => {
       await this.handle?.abort(false);
-      this.flash("Interrupted. Background jobs continue.");
+      this.flash(t("app.interrupted"));
     });
   }
 
@@ -296,7 +297,7 @@ export class App {
         ? `--url ${this.device.url} --token <token> -s ${shellWord(ref.session)} -a ${shellWord(ref.agent)}`
         : shellWord(`${this.device.id}:${ref.session}:${ref.agent}`);
       process.stdout.write(
-        `\n${c.muted("The agent keeps running on")} ${adhoc ? this.device.name : this.device.id}${c.muted(". Reattach:")}\n  just tui attach ${target}\n\n`,
+        `\n${c.muted(t("app.keepsRunning"))} ${adhoc ? this.device.name : this.device.id}${c.muted(t("app.reattach"))}\n  just tui attach ${target}\n\n`,
       );
     }
     process.exit(0);
@@ -344,10 +345,14 @@ export class App {
     const lines: string[] = [];
     if (this.busy())
       lines.push(
-        `${c.warn("●")} ${c.secondary(s.retry ? `retrying: ${s.retry.error}` : s.compactions.length ? "compacting…" : "working…")} ${c.muted("esc to interrupt")}`,
+        `${c.warn("●")} ${c.secondary(s.retry ? t("status.retrying", { message: s.retry.error }) : s.compactions.length ? t("status.compacting") : t("status.working"))} ${c.muted(t("status.escToInterrupt"))}`,
       );
     for (const item of s.inbox)
-      lines.push(c.muted(`${item.mode === "steer" ? "↪ steer" : "⏳ queued"}: ${(item.content ?? "context update").replace(/\s+/g, " ")}`));
+      lines.push(
+        c.muted(
+          `${item.mode === "steer" ? t("status.steer") : t("status.queued")}: ${(item.content ?? t("status.contextUpdate")).replace(/\s+/g, " ")}`,
+        ),
+      );
     for (const n of s.notices.slice(-2)) lines.push(c.err(n));
     if (this.notice && Date.now() - this.notice.at < 6000)
       lines.push(this.notice.error ? c.err(this.notice.text) : c.ok(this.notice.text));
@@ -371,33 +376,33 @@ export class App {
     }
     const conn =
       this.connection === "live"
-        ? c.ok("● live")
+        ? c.ok(t("status.live"))
         : this.connection === "idle"
-          ? c.muted("○ no agent")
+          ? c.muted(t("status.noAgent"))
           : this.connection === "connecting"
-            ? c.warn("◌ connecting")
-            : c.err(`○ ${this.connection}`);
+            ? c.warn(t("status.connecting"))
+            : c.err(t("status.failed", { state: this.connection }));
     const lineage = this.agentId === undefined ? [] : this.session.lineage(this.agentId);
     const label = (kind: string, value: string) => `${c.muted(kind)} ${value}`;
     const agentLabel = lineage.length
       ? lineage
           .map((a) =>
             a.kind === "fork"
-              ? label("fork", `⑂ ${a.name}`)
+              ? label(t("header.fork"), `⑂ ${a.name}`)
               : a.kind === "subagent"
-                ? label("subagent", `↳ ${a.name}`)
-                : label("agent", a.name),
+                ? label(t("header.subagent"), `↳ ${a.name}`)
+                : label(t("header.agent"), a.name),
           )
           .join(c.muted(" › "))
       : this.agentId !== undefined
-        ? label("agent", `#${this.agentId}`)
+        ? label(t("header.agent"), `#${this.agentId}`)
         : "";
     const session = this.sessions.find((x) => x.id === this.sessionId);
     this.header.text = " " + (
       [
         c.bold(c.accent("dpi")),
-        label("device", c.secondary(this.device.id)),
-        session ? label("workspace", c.bold(session.name)) : c.muted("no workspace"),
+        label(t("header.device"), c.secondary(this.device.id)),
+        session ? label(t("header.workspace"), c.bold(session.name)) : c.muted(t("header.noWorkspace")),
         agentLabel,
         conn,
       ]
@@ -413,9 +418,9 @@ export class App {
       c.muted(
         [
           model ? `${model}: ${s.agent.thinkingLevel ?? "low"}` : "",
-          ctx === undefined ? "" : `${ctx}% CTX`,
-          `${compact(u.tokens)} tok $${u.cost.toFixed(3)}`,
-          bg ? `${bg} bg` : "",
+          ctx === undefined ? "" : t("footer.ctx", { percent: ctx }),
+          t("footer.tokens", { tokens: compact(u.tokens), cost: u.cost.toFixed(3) }),
+          bg ? t("footer.bg", { count: bg }) : "",
           "/help",
         ]
           .filter(Boolean)

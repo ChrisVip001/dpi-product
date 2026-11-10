@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { Laptop, Server } from "lucide-vue-next";
 import type { NetworkDevice } from "@sdk/api";
+import { t } from "../i18n";
 
 // The platform a device runs on: exe.dev VMs, Macs (from DeviceInfo.platform), else a generic box.
 const props = withDefaults(defineProps<{ device?: NetworkDevice; size?: number }>(), { size: 16 });
@@ -13,7 +14,12 @@ const kind = computed(() => {
 });
 const label = computed(
   () =>
-    ({ exe: "exe.dev VM", apple: "macOS", laptop: "This computer", server: "Server" })[kind.value],
+    ({
+      exe: t("deviceKind.exe"),
+      apple: t("deviceKind.apple"),
+      laptop: t("deviceKind.laptop"),
+      server: t("deviceKind.server"),
+    })[kind.value],
 );
 </script>
 

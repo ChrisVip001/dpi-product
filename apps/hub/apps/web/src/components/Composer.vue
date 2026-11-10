@@ -4,6 +4,7 @@ import { ArrowUp, ChevronDown, Clock3, Octagon, X } from "lucide-vue-next";
 import type { WhenBusy } from "@sdk/api";
 import { newId } from "../client/ids";
 import { commands, parseCommand, type SlashCommand } from "../client/commands";
+import { t } from "../i18n";
 import {
   agentHandle,
   agentState,
@@ -25,7 +26,7 @@ const menuClosed = ref(false);
 const matches = computed(() => {
   const m = ui.composer.match(/^\/(\S*)$/);
   return m && !menuClosed.value
-    ? commands.filter((c) => c.name.startsWith(m[1].toLowerCase()))
+    ? commands().filter((c) => c.name.startsWith(m[1].toLowerCase()))
     : [];
 });
 watch(
@@ -115,12 +116,12 @@ function withdraw(id: number) {
     <div v-if="agentState.inbox.length" class="queue">
       <div v-for="item in agentState.inbox" :key="item.id">
         <Clock3 :size="18" /><span
-          >{{ item.mode === "steer" ? "Steer" : "Queued" }}:
-          {{ item.content ?? "Context update" }}</span
+          >{{ item.mode === "steer" ? t("composer.steer") : t("composer.queued") }}:
+          {{ item.content ?? t("composer.contextUpdate") }}</span
         ><button
           class="icon-button"
-          :aria-label="`Withdraw submission ${item.id}`"
-          title="Withdraw queued input"
+          :aria-label="t('composer.withdraw', { id: item.id })"
+          :title="t('composer.withdrawTitle')"
           @click="withdraw(item.id)"
         >
           <X :size="18" />
@@ -128,7 +129,7 @@ function withdraw(id: number) {
       </div>
     </div>
     <div class="composer">
-      <ul v-if="matches.length" class="slash-menu" role="listbox" aria-label="Slash commands">
+      <ul v-if="matches.length" class="slash-menu" role="listbox" :aria-label="t('composer.slashLabel')">
         <li
           v-for="(c, i) in matches"
           :key="c.name"
@@ -145,8 +146,8 @@ function withdraw(id: number) {
       <textarea
         v-model="ui.composer"
         rows="2"
-        placeholder="Give your agent something to do, or type / for commands…"
-        aria-label="Message your agent"
+        :placeholder="t('composer.placeholder')"
+        :aria-label="t('composer.messageLabel')"
         @keydown="keydown"
       />
       <div class="composer-toolbar">
@@ -154,12 +155,12 @@ function withdraw(id: number) {
           <div class="queue-mode">
             <select
               v-model="mode"
-              aria-label="When busy"
-              title="Follow-up waits for this run. Steer joins after a tool round."
+              :aria-label="t('composer.whenBusy')"
+              :title="t('composer.whenBusyTitle')"
             >
-              <option value="followUp">Follow-up</option>
-              <option value="steer">Steer</option>
-              <option value="reject">Reject if busy</option></select
+              <option value="followUp">{{ t("composer.followUp") }}</option>
+              <option value="steer">{{ t("composer.steerOption") }}</option>
+              <option value="reject">{{ t("composer.rejectIfBusy") }}</option></select
             ><ChevronDown :size="24" aria-hidden="true" />
           </div>
         </div>
@@ -167,13 +168,13 @@ function withdraw(id: number) {
           <button
             class="interrupt"
             :disabled="!busy || interrupting"
-            title="Stop foreground work and owned subagents (Escape). Background jobs continue."
+            :title="t('composer.interruptTitle')"
             @click="interrupt"
           >
-            <Octagon :size="24" class="stop-sign" fill="currentColor" />Interrupt</button
+            <Octagon :size="24" class="stop-sign" fill="currentColor" />{{ t("composer.interrupt") }}</button
           ><button
             class="send"
-            aria-label="Send message"
+            :aria-label="t('composer.send')"
             :disabled="!ui.composer.trim() || pending || !agentState.ready || !online"
             @click="send"
           >
@@ -183,7 +184,7 @@ function withdraw(id: number) {
       </div>
     </div>
     <div class="composer-footnote">
-      <span><i class="live-dot" />Closing this window never interrupts your agent.</span>
+      <span><i class="live-dot" />{{ t("composer.footnote") }}</span>
     </div>
   </div>
 </template>

@@ -4,6 +4,7 @@ import {
   Check,
   CircleHelp,
   Info,
+  Languages,
   Network,
   PanelLeft,
   PanelRight,
@@ -20,6 +21,7 @@ import OfflinePanel from "./components/OfflinePanel.vue";
 import NewSessionDialog from "./components/NewSessionDialog.vue";
 import PromptDialog from "./components/PromptDialog.vue";
 import ModelPicker from "./components/ModelPicker.vue";
+import { LOCALES, LOCALE_NAMES, forced, locale, setLocale, t, type Key, type Locale } from "./i18n";
 import {
   attempt,
   boot,
@@ -49,16 +51,26 @@ const onlineCount = computed(
 );
 const creatingAgent = ref(false);
 
+/** The help panel's six lessons, as keys, so both languages come from the catalog. */
+const HELP_STEPS: { title: Key; body: Key }[] = [
+  { title: "help.step1.title", body: "help.step1.body" },
+  { title: "help.step2.title", body: "help.step2.body" },
+  { title: "help.step3.title", body: "help.step3.body" },
+  { title: "help.step4.title", body: "help.step4.body" },
+  { title: "help.step5.title", body: "help.step5.body" },
+  { title: "help.step6.title", body: "help.step6.body" },
+];
+
 async function newAgent() {
   const handle = sessionHandle.value;
-  const t = selected.value;
-  if (!handle || !t || creatingAgent.value) return;
+  const target = selected.value;
+  if (!handle || !target || creatingAgent.value) return;
   creatingAgent.value = true;
   const created = await attempt(() => handle.createAgent({}));
   creatingAgent.value = false;
   if (created) {
-    select({ ...t, agentId: created.id });
-    notify("New agent. Same session, same shared App State.");
+    select({ ...target, agentId: created.id });
+    notify(t("topbar.newAgentToast"));
   }
 }
 
@@ -99,6 +111,10 @@ function resize(e: PointerEvent) {
   window.addEventListener("pointerup", up);
 }
 
+function pickLanguage(e: Event) {
+  setLocale((e.target as HTMLSelectElement).value as Locale);
+}
+
 onMounted(() => {
   document.addEventListener("keydown", keydown);
   void boot();
@@ -115,8 +131,8 @@ onBeforeUnmount(() => {
       <div class="brand">
         <button
           class="icon-button tree-toggle"
-          aria-label="Toggle network"
-          title="Network"
+          :aria-label="t('topbar.toggleNetwork')"
+          :title="t('topbar.networkTitle')"
           @click="ui.drawer = !ui.drawer"
         >
           <PanelLeft :size="19" /></button
@@ -124,38 +140,47 @@ onBeforeUnmount(() => {
           >dpi-product</strong
         ><span
           class="network-summary"
-          :title="`${onlineCount} of ${network.devices.value.length} devices online`"
-          ><Network :size="16" />{{ onlineCount }} of
-          {{ network.devices.value.length }} online</span
+          :title="t('topbar.onlineOf', { online: onlineCount, total: network.devices.value.length })"
+          ><Network :size="16" />{{ t("topbar.onlineOf", { online: onlineCount, total: network.devices.value.length }) }}</span
         >
       </div>
       <div class="top-actions">
         <span class="connection"
           ><i :class="{ online: streamState === 'live' }" />{{
-            streamState === "live" ? "Connected" : "Reconnecting"
+            streamState === "live" ? t("topbar.connected") : t("topbar.reconnecting")
           }}</span
+        ><label v-if="!forced" class="language" :title="t('topbar.language')">
+          <Languages :size="17" aria-hidden="true" /><select
+            :value="locale"
+            :aria-label="t('topbar.language')"
+            @change="pickLanguage"
+          >
+            <option v-for="code in LOCALES" :key="code" :value="code">
+              {{ LOCALE_NAMES[code] }}
+            </option>
+          </select></label
         ><button
           class="icon-button"
-          title="How this works"
-          aria-label="How this works"
+          :title="t('topbar.howItWorks')"
+          :aria-label="t('topbar.howItWorks')"
           @click="ui.dialog = { kind: 'help' }"
         >
           <CircleHelp :size="19" /></button
         ><button
           class="secondary small new-agent-button"
           :disabled="!selected || !online || creatingAgent"
-          title="Start a fresh agent in this session"
+          :title="t('topbar.newAgentTitle')"
           @click="newAgent"
         >
-          <Plus :size="18" />New agent
+          <Plus :size="18" />{{ t("topbar.newAgent") }}
         </button>
         <button class="primary small" @click="openNewSession">
-          <Plus :size="18" />New session
+          <Plus :size="18" />{{ t("topbar.newSession") }}
         </button>
         <button
           class="icon-button inspector-toggle"
-          aria-label="Toggle inspector"
-          title="Inspector"
+          :aria-label="t('topbar.toggleInspector')"
+          :title="t('topbar.inspectorTitle')"
           :disabled="!selected || !online"
           @click="ui.inspectorOverlay ? hideInspector() : showInspector()"
         >
@@ -165,7 +190,9 @@ onBeforeUnmount(() => {
     </header>
     <div v-if="ui.error" class="error-banner" role="alert">
       <Info :size="18" /><span>{{ ui.error }}</span
-      ><button class="icon-button" aria-label="Dismiss error" @click="ui.error = ''">×</button>
+      ><button class="icon-button" :aria-label="t('topbar.dismissError')" @click="ui.error = ''">
+        ×
+      </button>
     </div>
     <main class="net-workspace" :style="{ '--tree-w': `${treeWidth}px` }">
       <NetworkSidebar />
@@ -174,7 +201,7 @@ onBeforeUnmount(() => {
         class="tree-resizer"
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize network tree"
+        :aria-label="t('topbar.resizeTree')"
         @pointerdown.prevent="resize"
       />
       <div v-if="ui.drawer" class="tree-backdrop" @click="ui.drawer = false" />
@@ -186,18 +213,18 @@ onBeforeUnmount(() => {
       <OfflinePanel v-else-if="selected && device" :device="device" />
       <section v-else class="welcome">
         <img class="welcome-symbol" src="/icons/dpi-product.svg" alt="dpi-product" />
-        <span class="eyebrow">THE DURABLE AGENT NETWORK</span>
-        <h1>Close the tab.<br />The work continues.</h1>
-        <p>Agents run on your devices. This page is only a window into them.</p>
+        <span class="eyebrow">{{ t("welcome.eyebrow") }}</span>
+        <h1>{{ t("welcome.title1") }}<br />{{ t("welcome.title2") }}</h1>
+        <p>{{ t("welcome.body") }}</p>
         <button class="primary" :disabled="!onlineCount" @click="openNewSession">
           <Plus :size="18" />{{
-            network.devices.value.length ? "Create a session" : "Add a device to dpi-network.yaml"
+            network.devices.value.length ? t("welcome.create") : t("welcome.addDevice")
           }}
         </button>
         <div class="welcome-features">
-          <span><Database :size="18" />SQLite on each device</span
-          ><span><GitFork :size="18" />Branch any agent</span
-          ><span><Activity :size="18" />Watch from anywhere</span>
+          <span><Database :size="18" />{{ t("welcome.featureSqlite") }}</span
+          ><span><GitFork :size="18" />{{ t("welcome.featureFork") }}</span
+          ><span><Activity :size="18" />{{ t("welcome.featureWatch") }}</span>
         </div>
       </section>
     </main>
@@ -225,17 +252,19 @@ onBeforeUnmount(() => {
         aria-labelledby="path-title"
       >
         <header>
-          <h2 id="path-title">Working directory</h2>
+          <h2 id="path-title">{{ t("path.title") }}</h2>
           <button
             class="icon-button"
-            aria-label="Close working directory"
+            :aria-label="t('path.close')"
             @click="ui.dialog = undefined"
           >
             <X :size="18" />
           </button>
         </header>
         <code class="full-directory">{{ ui.dialog.path }}</code>
-        <footer><button class="secondary" @click="ui.dialog = undefined">Close</button></footer>
+        <footer>
+          <button class="secondary" @click="ui.dialog = undefined">{{ t("common.close") }}</button>
+        </footer>
       </section>
     </div>
     <div
@@ -246,80 +275,24 @@ onBeforeUnmount(() => {
       <section class="modal help-modal">
         <header>
           <div>
-            <span class="eyebrow">LEARN BY DOING</span>
-            <h2>What makes this durable?</h2>
+            <span class="eyebrow">{{ t("help.eyebrow") }}</span>
+            <h2>{{ t("help.title") }}</h2>
           </div>
-          <button class="icon-button" aria-label="Close help" @click="ui.dialog = undefined">
+          <button class="icon-button" :aria-label="t('help.close')" @click="ui.dialog = undefined">
             <X :size="18" />
           </button>
         </header>
         <ol class="learning-list">
-          <li>
-            <span>01</span>
+          <li v-for="(step, i) in HELP_STEPS" :key="step.title">
+            <span>0{{ i + 1 }}</span>
             <div>
-              <strong>Pick a device, start a session</strong>
-              <p>
-                Every device in the tree runs backend. A session gets its own SQLite database on
-                that device, in the directory you choose.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>02</span>
-            <div>
-              <strong>Send work, then close the browser</strong>
-              <p>
-                The device owns the run. Reopening restores committed messages, state and live
-                progress.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>03</span>
-            <div>
-              <strong>Change state and fork</strong>
-              <p>
-                Edit App State by hand or through the agent. Every session and fork on a device
-                shares it.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>04</span>
-            <div>
-              <strong>Interrupt deliberately</strong>
-              <p>
-                Interrupt stops foreground work and owned subagents. Background jobs continue. Stop
-                all includes them.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>05</span>
-            <div>
-              <strong>Explore the boundaries</strong>
-              <p>
-                Queue a follow-up, steer after tools, wait for approval, compact context, reset or
-                inspect raw state.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>06</span>
-            <div>
-              <strong>Restart a device</strong>
-              <p>
-                Its tree dims and shows the restart command. Checkpointed jobs recover on boot.
-                Replay-safe tools may rerun. Other interrupted tools return an error.
-              </p>
+              <strong>{{ t(step.title) }}</strong>
+              <p>{{ t(step.body) }}</p>
             </div>
           </li>
         </ol>
         <div class="callout">
-          <Info :size="18" /><span
-            >Durable does not mean exactly-once external effects. Checkpoints protect progress.
-            Tools still need their own idempotency.</span
-          >
+          <Info :size="18" /><span>{{ t("help.callout") }}</span>
         </div>
       </section>
     </div>

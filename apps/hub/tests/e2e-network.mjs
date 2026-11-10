@@ -114,7 +114,7 @@ try {
     body: JSON.stringify({ value: { deviceId: device, sessionId: session.id, agentId: 1 } }),
   });
   browser = await launch();
-  let page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  let page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: "en-US" });
   await page.goto(hub);
   await expect(page.locator(".device-chip")).toHaveText(device, { timeout: 20000 });
   await expect(
@@ -208,7 +208,7 @@ try {
 
   // 6. Fork from the web at the first agent reply; reattach the TUI to the fork.
   browser = await launch();
-  page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: "en-US" });
   await page.goto(hub);
   await expect(page.locator(".device-chip")).toHaveText(device, { timeout: 30000 });
   const firstReply = page.locator("[data-testid=chat] .entry.pi-assistant").first();

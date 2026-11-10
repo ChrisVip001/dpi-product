@@ -3,6 +3,7 @@ import { nextTick, onMounted, ref } from "vue";
 import { X } from "lucide-vue-next";
 import { message } from "../client/hub";
 import type { Dialog } from "../client/store";
+import { t } from "../i18n";
 
 // One dialog for every name/note/confirm prompt: rename, fork, reset, archive, remove.
 const props = defineProps<{ dialog: Extract<Dialog, { kind: "prompt" }> }>();
@@ -44,7 +45,7 @@ onMounted(() => void nextTick(() => (input.value?.focus(), input.value?.select()
         <button
           type="button"
           class="icon-button"
-          aria-label="Close dialog"
+          :aria-label="t('prompt.close')"
           :disabled="busy"
           @click="emit('close')"
         >
@@ -54,7 +55,7 @@ onMounted(() => void nextTick(() => (input.value?.focus(), input.value?.select()
       <p v-if="dialog.hint" class="hint">{{ dialog.hint }}</p>
       <label v-if="hasInput"
         >{{ dialog.label }}
-        <span v-if="dialog.optional" class="muted">(optional)</span>
+        <span v-if="dialog.optional" class="muted">{{ t("common.optional") }}</span>
         <textarea
           v-if="dialog.multiline"
           ref="input"
@@ -74,14 +75,14 @@ onMounted(() => void nextTick(() => (input.value?.focus(), input.value?.select()
       <p v-if="error" class="message-error" role="alert">{{ error }}</p>
       <footer>
         <button type="button" class="secondary" :disabled="busy" @click="emit('close')">
-          Cancel
+          {{ t("common.cancel") }}
         </button>
         <button
           class="primary"
           :class="{ danger: dialog.danger }"
           :disabled="busy || (hasInput && !dialog.optional && !value.trim())"
         >
-          {{ busy ? "Working…" : dialog.submit }}
+          {{ busy ? t("common.working") : dialog.submit }}
         </button>
       </footer>
     </form>

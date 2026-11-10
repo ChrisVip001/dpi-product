@@ -18,6 +18,7 @@ import { lineage } from "@sdk/models";
 import TranscriptItem from "./TranscriptItem.vue";
 import DeviceIcon from "./DeviceIcon.vue";
 import Composer from "./Composer.vue";
+import { t } from "../i18n";
 import {
   activeLineage,
   agent,
@@ -51,10 +52,10 @@ const runningTool = computed(() =>
 
 const source = (a: AgentSummary) =>
   a.kind === "fork"
-    ? `Forked from agent #${a.parentId} at entry #${a.forkedAt}`
+    ? t("view.forkedFrom", { parent: a.parentId ?? "?", entry: a.forkedAt ?? "?" })
     : a.kind === "subagent"
-      ? `Owned by agent #${a.ownerAgentId}`
-      : "Root agent";
+      ? t("view.ownedBy", { owner: a.ownerAgentId ?? "?" })
+      : t("tree.rootAgent");
 const choices = computed(() =>
   sessionAgents.value
     .map((a) => ({ ...a, lineage: lineage(sessionAgents.value, a.id) }))
@@ -66,7 +67,8 @@ const choices = computed(() =>
 );
 const current = computed(() => activeLineage.value.at(-1));
 
-const kindLabel = (a: AgentSummary) => (a.kind === "root" ? "agent" : a.kind);
+const kindLabel = (a: AgentSummary) =>
+  a.kind === "root" ? t("view.kind.agent") : a.kind;
 
 /** Device crumb: show it in the network tree. Workspace crumb: open its root agent. */
 function revealDevice() {
@@ -86,20 +88,23 @@ function choose(id: number) {
 
 function fork(entryId: number) {
   const handle = agentHandle.value;
-  const t = selected.value;
-  if (!handle || !t) return;
+  const target = selected.value;
+  if (!handle || !target) return;
   ui.dialog = {
     kind: "prompt",
-    title: "Fork conversation",
-    hint: `${current.value?.name ?? `Agent #${t.agentId}`} / entry #${entryId}. Leave the name blank to use Fork #ID.`,
-    label: "Fork name",
+    title: t("view.forkTitle"),
+    hint: t("view.forkHint", {
+      agent: current.value?.name ?? t("view.agentNumber", { id: target.agentId }),
+      entry: entryId,
+    }),
+    label: t("view.forkName"),
     optional: true,
-    placeholder: "e.g. Alternative approach",
-    submit: "Create fork",
+    placeholder: t("view.forkPlaceholder"),
+    submit: t("view.createFork"),
     run: async (name) => {
       const created = await handle.fork({ entryId, name: name || undefined });
-      select({ ...t, agentId: created.id });
-      notify(`Forked at entry #${entryId}. App State stays shared.`);
+      select({ ...target, agentId: created.id });
+      notify(t("slash.fork.done", { entry: entryId }));
     },
   };
 }
@@ -110,11 +115,11 @@ function renameAgent() {
   if (!handle || !a) return;
   ui.dialog = {
     kind: "prompt",
-    title: "Rename agent",
-    label: "Agent name",
+    title: t("dialog.renameAgent.title"),
+    label: t("dialog.agentName.label"),
     value: a.named ? a.name : "",
     placeholder: a.name,
-    submit: "Save name",
+    submit: t("dialog.saveName"),
     run: (name) => handle.rename(name),
   };
 }
@@ -156,10 +161,10 @@ watch(
           <nav
             ref="lineageNav"
             class="crumbs conversation-lineage"
-            aria-label="Conversation lineage"
+            :aria-label="t('view.lineage')"
           >
             <button class="crumb" :title="`${device?.name} · ${device?.url}`" @click="revealDevice">
-              <span class="crumb-kind">device</span>
+              <span class="crumb-kind">{{ t("view.crumbDevice") }}</span>
               <span class="crumb-main"
                 ><DeviceIcon :device="device" :size="18" /><span class="device-chip">{{
                   device?.id
@@ -168,7 +173,7 @@ watch(
             </button>
             <ChevronRight class="crumb-sep" :size="18" aria-hidden="true" />
             <button class="crumb" :title="sessionSummary?.cwd" @click="openWorkspace">
-              <span class="crumb-kind">workspace</span>
+              <span class="crumb-kind">{{ t("view.crumbWorkspace") }}</span>
               <span class="crumb-main"
                 ><FolderOpen :size="18" aria-hidden="true" /><span class="crumb-name">{{
                   sessionSummary?.name
@@ -204,8 +209,8 @@ watch(
           </nav>
           <button
             class="icon-button"
-            aria-label="Rename agent"
-            title="Rename this agent"
+            :aria-label="t('view.renameAgent')"
+            :title="t('view.renameAgentTitle')"
             :disabled="!current"
             @click="renameAgent"
           >
@@ -213,11 +218,11 @@ watch(
           </button>
           <button
             class="icon-button conversation-menu-toggle"
-            aria-label="Browse conversations"
+            :aria-label="t('view.browse')"
             aria-haspopup="dialog"
             :aria-expanded="picker"
             aria-controls="conversation-picker"
-            title="Browse roots and forks"
+            :title="t('view.browseTitle')"
             @click="picker = !picker"
           >
             <ChevronDown :size="18" />
@@ -229,16 +234,16 @@ watch(
         <template v-if="picker">
           <button
             class="conversation-menu-dismiss"
-            aria-label="Close conversation picker"
+            :aria-label="t('view.closePicker')"
             @click="picker = false"
           />
           <section
             id="conversation-picker"
             class="conversation-picker"
             role="dialog"
-            aria-label="Choose conversation"
+            :aria-label="t('view.chooseConversation')"
           >
-            <div class="conversation-picker-heading">Roots &amp; forks</div>
+            <div class="conversation-picker-heading">{{ t("view.rootsAndForks") }}</div>
             <button
               v-for="c in choices"
               :key="c.id"
@@ -270,49 +275,39 @@ watch(
     <div ref="chat" class="chat-scroll" data-testid="chat">
       <div v-if="!agentState.ready" class="chat-empty">
         <Activity :size="30" />
-        <h2 v-if="agent.status.value === 'fault'">This agent is unavailable.</h2>
-        <h2 v-else>Connecting to the agent…</h2>
+        <h2 v-if="agent.status.value === 'fault'">{{ t("view.unavailable") }}</h2>
+        <h2 v-else>{{ t("view.connecting") }}</h2>
         <p v-if="agent.fault.value" class="message-error">{{ agent.fault.value }}</p>
-        <p v-else>The agent keeps working on {{ device?.id }} while this view connects.</p>
+        <p v-else>{{ t("view.keepsWorking", { device: device?.id ?? "" }) }}</p>
       </div>
       <template v-else>
         <div v-if="!items.length" class="chat-empty">
           <div class="agent-orb"><img src="/icons/dpi-product.svg" alt="dpi-product" /><i /></div>
-          <span class="eyebrow">YOUR DURABLE AGENT IS READY</span>
-          <h2>A conversation with continuity.</h2>
-          <p>Messages, tools and state live on {{ device?.id }}, beyond this window.</p>
+          <span class="eyebrow">{{ t("view.readyEyebrow") }}</span>
+          <h2>{{ t("view.readyTitle") }}</h2>
+          <p>{{ t("view.readyBody", { device: device?.id ?? "" }) }}</p>
           <div class="starter-grid">
-            <button
-              @click="
-                preset(
-                  'Inspect this directory using your tools and give me a brief overview. Do not modify any files.',
-                )
-              "
-            >
-              <FolderOpen :size="18" /><strong>Explore this directory</strong
-              ><span>See coding tools in action</span><ArrowUpRight :size="18" /></button
-            ><button
-              @click="
-                preset(
-                  'Use read_state, then update_state to add a field called progress with value 1 and a boolean called ready with value false.',
-                )
-              "
-            >
-              <Braces :size="18" /><strong>Make a state change</strong
-              ><span>Watch the workspace update</span><ArrowUpRight :size="18" />
+            <button @click="preset(t('view.starterExplorePrompt'))">
+              <FolderOpen :size="18" /><strong>{{ t("view.starterExplore") }}</strong
+              ><span>{{ t("view.starterExploreSub") }}</span><ArrowUpRight :size="18" /></button
+            ><button @click="preset(t('view.starterStatePrompt'))">
+              <Braces :size="18" /><strong>{{ t("view.starterState") }}</strong
+              ><span>{{ t("view.starterStateSub") }}</span><ArrowUpRight :size="18" />
             </button>
           </div>
         </div>
         <TranscriptItem v-for="item in items" :key="item.id" :item="item" @fork="fork" />
         <div v-if="agentState.running && !liveItem && !runningTool" class="entry live-generation">
           <div class="message-label">
-            AGENT
-            <span class="streaming">{{ agentState.retry ? "Retry scheduled" : "Working" }}</span>
+            {{ t("view.agentLabel") }}
+            <span class="streaming">{{
+              agentState.retry ? t("view.retryScheduled") : t("view.working")
+            }}</span>
           </div>
           <div class="typing"><i /><i /><i /></div>
         </div>
         <p v-if="agentState.retry" class="hint retry-note">
-          Retrying: {{ agentState.retry.error }}
+          {{ t("view.retrying", { message: agentState.retry.error }) }}
         </p>
         <p v-for="(n, i) in agentState.notices" :key="i" class="message-error">{{ n }}</p>
       </template>

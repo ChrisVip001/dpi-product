@@ -5,6 +5,7 @@ import { ref, shallowRef, watch } from "vue";
 import { Puzzle } from "lucide-vue-next";
 import type { AgentExtensions } from "@sdk/api";
 import { agentHandle, agentState, attempt, online, refreshDetail } from "../client/store";
+import { t } from "../i18n";
 
 const data = shallowRef<AgentExtensions>();
 const busy = ref(false);
@@ -34,14 +35,11 @@ async function set(patch: { name: string; enabled: boolean } | { prompt: string;
 <template>
   <div class="extensions-panel">
     <div class="panel-heading">
-      <h2>Extensions</h2>
+      <h2>{{ t("extensions.title") }}</h2>
       <Puzzle :size="18" />
     </div>
-    <p class="hint">
-      Custom harness capabilities for this agent. Turn one on and the next request uses it. The choice is stored
-      with the agent, so it survives restarts.
-    </p>
-    <p v-if="!data" class="task-empty">Loading extensions…</p>
+    <p class="hint">{{ t("extensions.hint") }}</p>
+    <p v-if="!data" class="task-empty">{{ t("extensions.loading") }}</p>
     <article
       v-for="ext in data?.extensions ?? []"
       :key="ext.name"
@@ -80,7 +78,7 @@ async function set(patch: { name: string; enabled: boolean } | { prompt: string;
           </label>
           <span>{{ p.description }}</span>
           <details>
-            <summary>View prompt</summary>
+            <summary>{{ t("extensions.viewPrompt") }}</summary>
             <pre>{{ p.text }}</pre>
           </details>
         </li>

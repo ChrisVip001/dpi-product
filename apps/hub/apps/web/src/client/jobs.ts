@@ -2,6 +2,8 @@
 // document), and the actions a run card or the Tasks tab can take.
 import { computed, ref } from "vue";
 import { JOB_RUNS_DOC, type JobDef, type JobRun, type JobRunsDoc } from "@sdk/jobs";
+import { jobTitle } from "./jobText";
+import { t } from "../i18n";
 import {
   agentHandle,
   agentState,
@@ -60,7 +62,7 @@ export async function startJob(def: JobDef) {
     agentHandle.value!.demo<{ taskId: number }>("jobs", { job: def.id }),
   );
   if (started) {
-    notify(`${def.title} started. It runs in the chat.`);
+    notify(t("jobs.started", { title: jobTitle(def.id, def.title) }));
     revealRun(started.taskId);
   }
 }

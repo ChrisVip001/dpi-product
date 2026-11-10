@@ -9,8 +9,8 @@ import {
   Server,
   ShieldCheck,
   Wrench,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Puzzle,
 } from "lucide-vue-next";
 import { THINKING_LEVELS, type ThinkingLevel } from "@sdk/api";
@@ -21,6 +21,7 @@ import ExtensionsPanel from "./ExtensionsPanel.vue";
 import ContextBar from "./ContextBar.vue";
 import { message } from "../client/hub";
 import { toolSignature } from "../client/signature";
+import { locale, t, type Key } from "../i18n";
 import {
   agentHandle,
   agentState,
@@ -49,23 +50,25 @@ import {
 
 // Each tool's parameters as a highlighted TypeScript declaration, rebuilt only when the tools change.
 const signatures = computed(
-  () => new Map(detail.value?.tools.map((t) => [t.name, toolSignature(t.name, t.parameters)])),
+  () => new Map(detail.value?.tools.map((tool) => [tool.name, toolSignature(tool.name, tool.parameters)])),
 );
 
-const tabs = [
-  { id: "session", label: "Session", icon: FolderOpen },
-  { id: "state", label: "State", icon: Braces },
-  { id: "tasks", label: "Tasks", icon: Activity },
-  { id: "tools", label: "Tools", icon: Wrench },
-  { id: "extensions", label: "Extend", icon: Puzzle },
+const TABS: { id: string; key: Key; icon: unknown }[] = [
+  { id: "session", key: "inspector.tab.session", icon: FolderOpen },
+  { id: "state", key: "inspector.tab.state", icon: Braces },
+  { id: "tasks", key: "inspector.tab.tasks", icon: Activity },
+  { id: "tools", key: "inspector.tab.tools", icon: Wrench },
+  { id: "extensions", key: "inspector.tab.extensions", icon: Puzzle },
 ];
+const tabs = computed(() => TABS.map((tab) => ({ ...tab, label: t(tab.key) })));
+
 const usageRows = computed(() => [
-  { label: "Input", tokens: usage.value.input, cost: usage.value.inputCost },
-  { label: "Output", tokens: usage.value.output, cost: usage.value.outputCost },
-  { label: "Cache read", tokens: usage.value.cacheRead, cost: usage.value.cacheReadCost },
-  { label: "Cache write", tokens: usage.value.cacheWrite, cost: usage.value.cacheWriteCost },
+  { label: t("inspector.usage.input"), tokens: usage.value.input, cost: usage.value.inputCost },
+  { label: t("inspector.usage.output"), tokens: usage.value.output, cost: usage.value.outputCost },
+  { label: t("inspector.usage.cacheRead"), tokens: usage.value.cacheRead, cost: usage.value.cacheReadCost },
+  { label: t("inspector.usage.cacheWrite"), tokens: usage.value.cacheWrite, cost: usage.value.cacheWriteCost },
 ]);
-const background = computed(() => tasks.value.filter((t) => t.background).length);
+const background = computed(() => tasks.value.filter((task) => task.background).length);
 
 function configure(
   patch: Parameters<NonNullable<typeof agentHandle.value>["configure"]>[0],
@@ -83,10 +86,10 @@ function renameSession() {
   if (!handle) return;
   ui.dialog = {
     kind: "prompt",
-    title: "Rename session",
-    label: "Session name",
+    title: t("dialog.renameSession.title"),
+    label: t("dialog.sessionName.label"),
     value: sessionSummary.value?.name ?? "",
-    submit: "Save name",
+    submit: t("dialog.saveName"),
     run: (name) => handle.rename(name),
   };
 }
@@ -130,7 +133,7 @@ async function saveStateJson() {
   try {
     const value = JSON.parse(stateDraft.value);
     if (!value || Array.isArray(value) || typeof value !== "object")
-      throw Error("App State must be a JSON object.");
+      throw Error(t("inspector.stateNotObject"));
     const saved = await agentHandle.value.demo<{ value: unknown; revision: number }>("state", {
       operation: "update",
       path: "",
@@ -140,7 +143,7 @@ async function saveStateJson() {
     stateDraft.value = json(saved.value);
     stateBaseline.value = stateDraft.value;
     stateDraftRevision.value = saved.revision;
-    notify("Shared App State saved.");
+    notify(t("inspector.stateSaved"));
   } catch (e) {
     stateError.value = message(e);
   } finally {
@@ -149,58 +152,58 @@ async function saveStateJson() {
 }
 
 const readOnly = computed(() => detail.value?.config.readOnly === true);
-const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered).length ?? 0);
+const offeredTools = computed(() => detail.value?.tools.filter((tool) => tool.offered).length ?? 0);
 </script>
 
 <template>
   <aside class="inspector" :class="{ collapsed: !inspectorExpanded, overlay: ui.inspectorOverlay }">
-    <div v-if="!inspectorExpanded" class="panel-rail" aria-label="Inspector (collapsed)">
+    <div v-if="!inspectorExpanded" class="panel-rail" :aria-label="t('inspector.railLabel')">
       <button
         class="icon-button panel-toggle"
-        aria-label="Expand inspector"
-        :title="`Expand inspector (${panelKeys.inspector})`"
+        :aria-label="t('inspector.expand')"
+        :title="t('inspector.expandTitle', { key: panelKeys.inspector })"
         @click="showInspector()"
       >
-        <PanelLeftOpen :size="18" />
+        <PanelRightOpen :size="18" />
       </button>
       <button
-        v-for="t in tabs"
-        :key="t.id"
+        v-for="tab in tabs"
+        :key="tab.id"
         class="rail-tab"
-        :class="{ active: ui.tab === t.id }"
-        :aria-label="`Open ${t.label}`"
-        :title="t.label"
-        @click="showInspector(t.id)"
+        :class="{ active: ui.tab === tab.id }"
+        :aria-label="t('inspector.openTab', { tab: tab.label })"
+        :title="tab.label"
+        @click="showInspector(tab.id)"
       >
-        <component :is="t.icon" :size="20" /><span
-          v-if="t.id === 'tasks' && tasks.length"
+        <component :is="tab.icon" :size="20" /><span
+          v-if="tab.id === 'tasks' && tasks.length"
           class="count"
           >{{ tasks.length }}</span
         >
       </button>
     </div>
     <template v-else>
-      <div class="inspector-tabs" role="tablist" aria-label="Session details">
+      <div class="inspector-tabs" role="tablist" :aria-label="t('inspector.tabsLabel')">
         <button
-          v-for="t in tabs"
-          :id="`inspector-tab-${t.id}`"
-          :key="t.id"
+          v-for="tab in tabs"
+          :id="`inspector-tab-${tab.id}`"
+          :key="tab.id"
           role="tab"
           aria-controls="inspector-panel"
-          :aria-selected="ui.tab === t.id"
-          :class="{ active: ui.tab === t.id }"
-          @click="ui.tab = t.id"
+          :aria-selected="ui.tab === tab.id"
+          :class="{ active: ui.tab === tab.id }"
+          @click="ui.tab = tab.id"
         >
-          <component :is="t.icon" :size="18" />{{ t.label
-          }}<span v-if="t.id === 'tasks' && tasks.length" class="count">{{ tasks.length }}</span>
+          <component :is="tab.icon" :size="18" />{{ tab.label
+          }}<span v-if="tab.id === 'tasks' && tasks.length" class="count">{{ tasks.length }}</span>
         </button>
         <button
           class="icon-button panel-toggle"
-          aria-label="Collapse inspector"
-          :title="`Collapse inspector (${panelKeys.inspector})`"
+          :aria-label="t('inspector.collapse')"
+          :title="t('inspector.collapseTitle', { key: panelKeys.inspector })"
           @click="hideInspector()"
         >
-          <PanelLeftClose :size="18" />
+          <PanelRightClose :size="18" />
         </button>
       </div>
       <div
@@ -213,11 +216,11 @@ const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered)
         <template v-if="ui.tab === 'session'">
           <section class="session-heading">
             <h1>
-              <span>{{ sessionSummary?.name ?? "Loading session" }}</span
+              <span>{{ sessionSummary?.name ?? t("inspector.loadingSession") }}</span
               ><button
                 class="icon-button"
-                title="Rename session"
-                aria-label="Rename session"
+                :title="t('dialog.renameSession.title')"
+                :aria-label="t('dialog.renameSession.title')"
                 @click="renameSession"
               >
                 <Pencil :size="18" />
@@ -226,7 +229,7 @@ const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered)
             <button
               class="path cwd-button"
               :title="sessionSummary?.cwd"
-              aria-label="Show full working directory"
+              :aria-label="t('inspector.showCwd')"
               @click="ui.dialog = { kind: 'path', path: sessionSummary?.cwd ?? '' }"
             >
               <FolderOpen :size="18" /><span class="cwd-trail" dir="rtl"
@@ -235,20 +238,22 @@ const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered)
             </button>
             <div class="session-status">
               <span class="status-pill" :class="{ working: busy }"
-                ><i />{{ busy ? "Working" : "Idle" }}</span
-              ><span v-if="background" class="background-pill">{{ background }} background</span
+                ><i />{{ busy ? t("view.working") : t("inspector.idle") }}</span
+              ><span v-if="background" class="background-pill">{{
+                t("inspector.background", { count: background })
+              }}</span
               ><span class="saved"><Server :size="18" />{{ device?.id }}</span>
             </div>
           </section>
           <section class="model-section">
             <div class="section-label">
-              <span>AGENT</span>
+              <span>{{ t("inspector.agentSection") }}</span>
             </div>
             <button class="model-button" @click="ui.dialog = { kind: 'models' }">
               <img :src="icon(agentState.agent.model?.modelId)" alt="" />
               <div>
                 <strong>{{
-                  currentModel?.name ?? agentState.agent.model?.modelId ?? "Loading…"
+                  currentModel?.name ?? agentState.agent.model?.modelId ?? t("inspector.loading")
                 }}</strong
                 ><small
                   >{{ currentModel?.tier ?? "" }} /
@@ -258,14 +263,16 @@ const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered)
               <ChevronDown :size="18" />
             </button>
             <div class="thinking-row">
-              <span>Thinking</span
+              <span>{{ t("inspector.thinking") }}</span
               ><select
-                aria-label="Thinking level"
+                :aria-label="t('inspector.thinkingLevel')"
                 :value="agentState.agent.thinkingLevel ?? 'low'"
                 @change="
                   configure(
                     { thinkingLevel: ($event.target as HTMLSelectElement).value as ThinkingLevel },
-                    `Thinking ${($event.target as HTMLSelectElement).value}. Used on the next turn.`,
+                    t('slash.thinking.done', {
+                      level: ($event.target as HTMLSelectElement).value,
+                    }),
                   )
                 "
               >
@@ -274,33 +281,35 @@ const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered)
             </div>
             <ContextBar />
             <section class="stats-section" aria-labelledby="stats-title">
-              <div class="section-label"><span id="stats-title">STATS</span></div>
+              <div class="section-label"><span id="stats-title">{{ t("inspector.stats") }}</span></div>
               <div class="metrics">
-                <div :title="`${usage.tokens.toLocaleString('en-US')} total tokens`">
+                <div
+                  :title="t('inspector.totalTokensTitle', { total: usage.tokens.toLocaleString(locale) })"
+                >
                   <span>{{ number(usage.tokens) }}</span
-                  ><small>total tokens</small>
+                  ><small>{{ t("inspector.totalTokens") }}</small>
                 </div>
                 <div>
                   <span>${{ usage.cost.toFixed(4) }}</span
-                  ><small>agent cost</small>
+                  ><small>{{ t("inspector.agentCost") }}</small>
                 </div>
                 <div>
                   <span>{{ detail?.tools.length ?? 0 }}</span
-                  ><small>tools</small>
+                  ><small>{{ t("inspector.toolsCount") }}</small>
                 </div>
               </div>
-              <table class="usage-breakdown" aria-label="Agent token and cost breakdown">
+              <table class="usage-breakdown" :aria-label="t('inspector.usageBreakdown')">
                 <thead>
                   <tr>
-                    <th scope="col">Type</th>
-                    <th scope="col">Tokens</th>
-                    <th scope="col">Cost (USD)</th>
+                    <th scope="col">{{ t("inspector.colType") }}</th>
+                    <th scope="col">{{ t("inspector.colTokens") }}</th>
+                    <th scope="col">{{ t("inspector.colCost") }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="row in usageRows" :key="row.label">
                     <th scope="row">{{ row.label }}</th>
-                    <td>{{ row.tokens.toLocaleString("en-US") }}</td>
+                    <td>{{ row.tokens.toLocaleString(locale) }}</td>
                     <td>${{ row.cost.toFixed(4) }}</td>
                   </tr>
                 </tbody>
@@ -310,40 +319,36 @@ const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered)
         </template>
         <template v-if="ui.tab === 'state'">
           <div class="panel-heading">
-            <h2>App State</h2>
+            <h2>{{ t("inspector.appStateTitle") }}</h2>
             <Braces :size="18" />
           </div>
           <p class="hint app-state-description">
-            One shared JSON object for every agent, session and fork on {{ device?.id }}. You and
-            your agents can read, create, update or delete values and fields. Changes appear live
-            and persist across closed browsers, interrupted agents and backend restarts.
+            {{ t("inspector.appStateBody", { device: device?.id ?? "" }) }}
           </p>
           <textarea
             v-model="stateDraft"
             class="app-state-json"
-            aria-label="App State JSON"
+            :aria-label="t('inspector.appStateJson')"
             spellcheck="false"
             :disabled="stateSaving || !shared"
             rows="12"
           />
           <div class="state-json-actions">
-            <span v-if="stateConflict" class="hint"
-              >State changed elsewhere. Load the latest JSON before saving.</span
-            >
+            <span v-if="stateConflict" class="hint">{{ t("inspector.stateConflict") }}</span>
             <button
               v-if="stateDirty"
               class="secondary"
               :disabled="stateSaving"
               @click="resetStateDraft"
             >
-              {{ stateConflict ? "Load latest" : "Reset" }}
+              {{ stateConflict ? t("inspector.loadLatest") : t("inspector.reset") }}
             </button>
             <button
               class="primary small"
               :disabled="!stateDirty || stateSaving || stateConflict"
               @click="saveStateJson"
             >
-              {{ stateSaving ? "Saving…" : "Save JSON" }}
+              {{ stateSaving ? t("inspector.saving") : t("inspector.saveJson") }}
             </button>
           </div>
           <p v-if="stateError" class="message-error" role="alert">{{ stateError }}</p>
@@ -357,33 +362,30 @@ const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered)
         <ExtensionsPanel v-if="ui.tab === 'extensions'" />
         <template v-if="ui.tab === 'tools'"
           ><div class="panel-heading">
-            <h2>Tools</h2>
+            <h2>{{ t("inspector.toolsTitle") }}</h2>
             <span class="tag">{{ offeredTools }} / {{ detail?.tools.length ?? 0 }}</span>
           </div>
-          <p class="hint">Every tool this agent's extensions provide. Open one to see its definition.</p>
+          <p class="hint">{{ t("inspector.toolsHint") }}</p>
           <div class="hook-card">
             <div>
-              <ShieldCheck :size="18" /><strong>Read only</strong
+              <ShieldCheck :size="18" /><strong>{{ t("inspector.readOnly") }}</strong
               ><button
                 class="switch"
                 role="switch"
                 :aria-checked="readOnly"
-                aria-label="Read only"
+                :aria-label="t('inspector.readOnly')"
                 :class="{ on: readOnly }"
                 @click="
                   configure(
                     { readOnly: !readOnly },
-                    readOnly ? 'Read only off. Every tool is back.' : 'Read only on. Tools that write are disabled.',
+                    readOnly ? t('inspector.readOnlyOff') : t('inspector.readOnlyOn'),
                   )
                 "
               >
                 <span />
               </button>
             </div>
-            <p>
-              Offers this agent only tools that read. Tools that create, update or delete leave its next request, and
-              the choice is stored with the agent.
-            </p>
+            <p>{{ t("inspector.readOnlyBody") }}</p>
           </div>
           <details
             v-for="tool in detail?.tools"
@@ -393,19 +395,21 @@ const offeredTools = computed(() => detail.value?.tools.filter((t) => t.offered)
           >
             <summary>
               <Wrench :size="18" /><strong>{{ tool.name }}</strong
-              ><span v-if="!tool.offered" class="tag tool-disabled">disabled</span
-              ><span class="tag">{{ tool.replay === "safe" ? "replay safe" : "interrupt on crash" }}</span>
+              ><span v-if="!tool.offered" class="tag tool-disabled">{{
+                t("inspector.toolDisabled")
+              }}</span
+              ><span class="tag">{{
+                tool.replay === "safe" ? t("inspector.replaySafe") : t("inspector.interruptOnCrash")
+              }}</span>
             </summary>
             <p>{{ tool.description }}</p>
             <pre
               v-if="tool.parameters"
               class="tool-signature"
-              :aria-label="`${tool.name} TypeScript definition`"
-            ><code><span v-for="(t, i) in signatures.get(tool.name)" :key="i" :class="`tk-${t.kind}`">{{ t.text }}</span></code></pre>
+              :aria-label="t('inspector.toolSignature', { name: tool.name })"
+            ><code><span v-for="(part, i) in signatures.get(tool.name)" :key="i" :class="`tk-${part.kind}`">{{ part.text }}</span></code></pre>
             <small>{{
-              tool.replay === "safe"
-                ? "An interrupted execution may run again after recovery."
-                : "A crash records an interrupted result instead of rerunning this effect."
+              tool.replay === "safe" ? t("inspector.replaySafeNote") : t("inspector.replayUnsafeNote")
             }}</small>
           </details></template
         >

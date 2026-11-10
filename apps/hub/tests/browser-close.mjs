@@ -41,7 +41,9 @@ await fetch(`${hub}/api/ui-state/layout.panels`, {
 });
 const launch = () => chromium.launch({ channel: "chrome", headless: !process.env.HEADED });
 let browser = await launch();
-let page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+let page = await (
+  await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "en-US" })
+).newPage();
 try {
   await page.goto(hub);
   await expect(page.locator(".device-chip")).toHaveText(device, { timeout: 20000 });
@@ -80,7 +82,9 @@ try {
   expect(JSON.stringify(entries)).toContain("FULL_BROWSER_QUIT_OK");
 
   browser = await launch();
-  page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  page = await (
+    await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "en-US" })
+  ).newPage();
   await page.goto(hub);
   await expect(page.locator(".markdown").filter({ hasText: "Browser quit verified" })).toBeVisible({
     timeout: 20000,

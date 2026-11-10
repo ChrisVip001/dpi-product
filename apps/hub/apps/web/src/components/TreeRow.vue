@@ -15,6 +15,7 @@ import {
 import DeviceIcon from "./DeviceIcon.vue";
 import type { TreeNode } from "@sdk/models";
 import { ago } from "../client/store";
+import { t } from "../i18n";
 
 const props = defineProps<{
   node: TreeNode;
@@ -42,17 +43,17 @@ const statusText = computed(() => {
   const count = d.tree?.sessions.length ?? 0;
   switch (d.status) {
     case "online":
-      return `${count} session${count === 1 ? "" : "s"}`;
+      return t(count === 1 ? "tree.sessionOne" : "tree.sessionMany", { count });
     case "checking":
-      return "checking…";
+      return t("tree.checking");
     case "unauthorized":
-      return d.hasToken ? "token rejected" : "no token";
+      return d.hasToken ? t("tree.tokenRejected") : t("tree.noToken");
     case "mismatch":
-      return "identity changed";
+      return t("tree.identityChanged");
     case "incompatible":
-      return "incompatible";
+      return t("tree.incompatible");
     default:
-      return `offline · ${ago(d.lastSeenAt)}`;
+      return t("tree.offlineSince", { ago: ago(d.lastSeenAt) });
   }
 });
 const dot = computed(() => {
@@ -66,10 +67,10 @@ const title = computed(() => {
   if (session.value) return `${session.value.name}\n${session.value.cwd}`;
   const a = agent.value!;
   return a.kind === "fork"
-    ? `Fork of agent #${a.parentId} at entry #${a.forkedAt}`
+    ? t("tree.forkOf", { parent: a.parentId ?? "?", entry: a.forkedAt ?? "?" })
     : a.kind === "subagent"
-      ? `Subagent owned by agent #${a.ownerAgentId}`
-      : "Root agent";
+      ? t("tree.subagentOwned", { owner: a.ownerAgentId ?? "?" })
+      : t("tree.rootAgent");
 });
 </script>
 
@@ -90,7 +91,7 @@ const title = computed(() => {
       v-if="hasChildren"
       class="chev"
       tabindex="-1"
-      :aria-label="open ? `Collapse ${label}` : `Expand ${label}`"
+      :aria-label="open ? t('tree.collapse', { name: label }) : t('tree.expand', { name: label })"
       @click.stop="emit('toggle')"
     >
       <ChevronDown v-if="open" :size="16" /><ChevronRight v-else :size="16" />
@@ -106,15 +107,15 @@ const title = computed(() => {
         <button
           class="icon-button"
           :disabled="!online"
-          :aria-label="`New session on ${label}`"
-          title="New session on this device"
+          :aria-label="t('tree.newSessionOn', { name: label })"
+          :title="t('tree.newSessionOnTitle')"
           @click="emit('action', 'new-session')"
         >
           <Plus :size="16" /></button
         ><button
           class="icon-button"
-          :aria-label="`Check ${label}`"
-          title="Check connection now"
+          :aria-label="t('tree.check', { name: label })"
+          :title="t('tree.checkTitle')"
           @click="emit('action', 'check')"
         >
           <RefreshCw :size="16" />
@@ -125,32 +126,32 @@ const title = computed(() => {
       <FolderOpen class="ico" :size="16" />
       <b class="name">{{ label }}</b>
       <span class="path">…/{{ session.cwd.split("/").filter(Boolean).at(-1) }}</span>
-      <i v-if="busy" class="dot work" title="Working" />
-      <span v-if="background" class="bg-count" :title="`${background} background task(s)`"
-        ><i class="dot bg" />{{ background }} bg</span
+      <i v-if="busy" class="dot work" :title="t('tree.working')" />
+      <span v-if="background" class="bg-count" :title="t('tree.backgroundTasks', { count: background })"
+        ><i class="dot bg" />{{ t("tree.backgroundShort", { count: background }) }}</span
       >
       <span class="acts" @click.stop>
         <button
           class="icon-button"
           :disabled="!online"
-          :aria-label="`New agent in ${label}`"
-          title="New agent in this session"
+          :aria-label="t('tree.newAgentIn', { name: label })"
+          :title="t('tree.newAgentInTitle')"
           @click="emit('action', 'new-agent')"
         >
           <Plus :size="16" /></button
         ><button
           class="icon-button"
           :disabled="!online"
-          :aria-label="`Rename session ${label}`"
-          title="Rename session"
+          :aria-label="t('tree.renameSession', { name: label })"
+          :title="t('tree.renameSessionTitle')"
           @click="emit('action', 'rename')"
         >
           <Pencil :size="16" /></button
         ><button
           class="icon-button"
           :disabled="!online"
-          :aria-label="`Archive session ${label}`"
-          title="Archive session"
+          :aria-label="t('tree.archiveSession', { name: label })"
+          :title="t('tree.archiveSessionTitle')"
           @click="emit('action', 'archive')"
         >
           <Archive :size="16" />
@@ -165,16 +166,16 @@ const title = computed(() => {
       <span v-if="agent.kind === 'fork' && agent.forkedAt !== undefined" class="meta"
         >@ #{{ agent.forkedAt }}</span
       >
-      <i v-if="busy" class="dot work" title="Working" />
-      <span v-if="background" class="bg-count" :title="`${background} background task(s)`"
+      <i v-if="busy" class="dot work" :title="t('tree.working')" />
+      <span v-if="background" class="bg-count" :title="t('tree.backgroundTasks', { count: background })"
         ><i class="dot bg" />{{ background }}</span
       >
       <span class="acts" @click.stop>
         <button
           class="icon-button"
           :disabled="!online"
-          :aria-label="`Rename agent ${label}`"
-          title="Rename agent"
+          :aria-label="t('tree.renameAgent', { name: label })"
+          :title="t('tree.renameAgentTitle')"
           @click="emit('action', 'rename')"
         >
           <Pencil :size="16" />

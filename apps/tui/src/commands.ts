@@ -1,41 +1,42 @@
-// Slash commands. Anything that is not a known command goes to the agent as text, as in pi.
+// Slash commands. Anything that is not a known command goes to the agent as text.
 import type { SlashCommand } from "@earendil-works/pi-tui";
 import { THINKING_LEVELS, type ThinkingLevel } from "../../sdk/src/api.ts";
 import type { App } from "./app.ts";
+import { t } from "./i18n.ts";
 import { Panel, pickAgent, pickDevice, pickModel, pickSession } from "./pickers.ts";
 import { c } from "./theme.ts";
 
 export const COMMANDS: SlashCommand[] = [
-  { name: "sessions", description: "switch or create a session on this device" },
-  { name: "agents", description: "switch agent: roots, forks, subagents" },
-  { name: "model", description: "choose this agent's model" },
-  { name: "devices", description: "switch device" },
-  { name: "new", description: "new agent in this session", argumentHint: "[name]" },
-  { name: "fork", description: "fork at an entry (default: the last reply)", argumentHint: "[entryId] [name]" },
+  { name: "sessions", description: t("cmd.sessions") },
+  { name: "agents", description: t("cmd.agents") },
+  { name: "model", description: t("cmd.model") },
+  { name: "devices", description: t("cmd.devices") },
+  { name: "new", description: t("cmd.new"), argumentHint: t("arg.name") },
+  { name: "fork", description: t("cmd.fork"), argumentHint: t("arg.fork") },
   {
     name: "thinking",
-    description: "set the thinking level",
-    argumentHint: "<level>",
+    description: t("cmd.thinking"),
+    argumentHint: t("arg.level"),
     getArgumentCompletions: (prefix) =>
       THINKING_LEVELS.filter((l) => l.startsWith(prefix)).map((l) => ({ value: l, label: l })),
   },
-  { name: "compact", description: "summarize older context", argumentHint: "[instructions]" },
-  { name: "reset", description: "start a fresh context", argumentHint: "[handoff note]" },
-  { name: "name", description: "rename this agent", argumentHint: "<name>" },
-  { name: "tasks", description: "live tasks in this session" },
-  { name: "help", description: "keys and commands" },
-  { name: "quit", description: "exit (the agent keeps running)" },
+  { name: "compact", description: t("cmd.compact"), argumentHint: t("arg.instructions") },
+  { name: "reset", description: t("cmd.reset"), argumentHint: t("arg.handoff") },
+  { name: "name", description: t("cmd.name"), argumentHint: t("arg.newName") },
+  { name: "tasks", description: t("cmd.tasks") },
+  { name: "help", description: t("cmd.help") },
+  { name: "quit", description: t("cmd.quit") },
 ];
 
 const KEYS: [string, string][] = [
-  ["enter", "send; steers the agent while it works"],
-  ["alt+enter", "queue as a follow-up"],
-  ["esc", "interrupt foreground work"],
-  ["shift+tab", "cycle thinking level"],
-  ["ctrl+l", "model picker"],
-  ["ctrl+o", "expand tool output and thinking"],
-  ["ctrl+c", "clear input, or exit when empty"],
-  ["ctrl+d", "exit"],
+  ["enter", t("keys.enter")],
+  ["alt+enter", t("keys.altEnter")],
+  ["esc", t("keys.esc")],
+  ["shift+tab", t("keys.shiftTab")],
+  ["ctrl+l", t("keys.ctrlL")],
+  ["ctrl+o", t("keys.ctrlO")],
+  ["ctrl+c", t("keys.ctrlC")],
+  ["ctrl+d", t("keys.ctrlD")],
 ];
 
 /** Returns false when `text` is not a command, so the caller sends it to the agent. */
@@ -62,7 +63,7 @@ export async function runCommand(app: App, text: string): Promise<boolean> {
       await app.run(async () => {
         const created = await app.client.session(app.sessionId!).createAgent(arg ? { name: arg } : {});
         await app.attach(app.sessionId!, created.id);
-        app.flash(`New agent ${created.name}`);
+        app.flash(t("flash.newAgent", { name: created.name }));
       });
       break;
     case "fork": {
@@ -71,17 +72,17 @@ export async function runCommand(app: App, text: string): Promise<boolean> {
       const name = (explicit === undefined ? [first, ...rest] : rest).filter(Boolean).join(" ") || undefined;
       const entryId =
         explicit ?? app.model.state.entries.filter((e) => e.kind === "pi.assistant").at(-1)?.id;
-      if (entryId === undefined) return app.flash("Nothing to fork yet.", true), true;
+      if (entryId === undefined) return app.flash(t("flash.nothingToFork"), true), true;
       await app.run(async () => {
         const created = await handle!.fork({ entryId, name });
         await app.attach(app.sessionId!, created.id);
-        app.flash(`Forked at #${entryId} → ${created.name}`);
+        app.flash(t("flash.forked", { entry: entryId, name: created.name }));
       });
       break;
     }
     case "thinking": {
       if (!THINKING_LEVELS.includes(arg as ThinkingLevel))
-        return app.flash(`Levels: ${THINKING_LEVELS.join(", ")}`, true), true;
+        return app.flash(t("flash.levels", { levels: THINKING_LEVELS.join(", ") }), true), true;
       await app.run(async () => {
         await handle!.configure({ thinkingLevel: arg as ThinkingLevel });
       });
@@ -90,33 +91,36 @@ export async function runCommand(app: App, text: string): Promise<boolean> {
     case "compact":
       await app.run(async () => {
         await handle!.compact(arg || undefined);
-        app.flash("Compaction requested");
+        app.flash(t("flash.compaction"));
       });
       break;
     case "reset":
       await app.run(async () => {
         await handle!.reset(arg || undefined);
-        app.flash("New context started; history stays stored");
+        app.flash(t("flash.reset"));
       });
       break;
     case "name":
-      if (!arg) return app.flash("Usage: /name <name>", true), true;
+      if (!arg) return app.flash(t("flash.nameUsage"), true), true;
       await app.run(async () => {
         await handle!.rename(arg);
-        app.flash(`Agent renamed to ${arg}`);
+        app.flash(t("flash.renamed", { name: arg }));
       });
       break;
     case "tasks":
       app.overlay(
         new Panel(() => {
           const tasks = app.session.state.tasks;
-          const lines = [c.bold(c.accent(`Live tasks in ${app.sessionSummary()?.name ?? "session"}`)), ""];
-          if (!tasks.length) lines.push(c.muted("No live tasks."));
-          for (const t of tasks)
+          const lines = [
+            c.bold(c.accent(t("panel.liveTasks", { name: app.sessionSummary()?.name ?? t("panel.session") }))),
+            "",
+          ];
+          if (!tasks.length) lines.push(c.muted(t("panel.noLiveTasks")));
+          for (const task of tasks)
             lines.push(
-              `${t.background ? c.secondary("◌ bg") : c.warn("● fg")} #${t.id} ${t.kind} ${c.muted(`agent #${t.conversationId} │ ${t.state.status}${t.state.phase ? `/${t.state.phase}` : ""}`)}`,
+              `${task.background ? c.secondary(t("panel.bg")) : c.warn(t("panel.fg"))} #${task.id} ${task.kind} ${c.muted(`${t("panel.taskAgent", { agent: task.conversationId })} │ ${task.state.status}${task.state.phase ? `/${task.state.phase}` : ""}`)}`,
             );
-          lines.push("", c.muted("esc close"));
+          lines.push("", c.muted(t("panel.escClose")));
           return lines;
         }, () => app.closeOverlay()),
       );
@@ -132,7 +136,7 @@ export async function runCommand(app: App, text: string): Promise<boolean> {
             "",
             ...COMMANDS.map((x) => `${c.secondary(`/${x.name}`.padEnd(11))} ${x.description ?? ""}`),
             "",
-            c.muted("Closing tui never stops the agent. esc to close."),
+            c.muted(t("panel.helpFooter")),
           ],
           () => app.closeOverlay(),
         ),

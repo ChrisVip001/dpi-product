@@ -7,6 +7,7 @@ import { lineage } from "@sdk/models";
 import { HubStream } from "./stream";
 import { deviceClient, hub, message } from "./hub";
 import { useAgent, useDevice, useNetwork, useSession, type AgentTarget } from "./composables";
+import { locale, t } from "../i18n";
 
 export const stream = new HubStream();
 export const streamState = ref(stream.state);
@@ -149,7 +150,7 @@ watch(
   () => [agent.status.value, sessionSummary.value] as const,
   ([status, summary]) => {
     if (status !== "fault" || summary || !online.value) return;
-    notify("That session was archived on its device.");
+    notify(t("store.archived"));
     select(undefined);
   },
 );
@@ -290,18 +291,18 @@ export function preset(text: string) {
 // ------------------------------------------------------------------ formatting
 
 export const number = (n: number) =>
-  Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  Intl.NumberFormat(locale.value, { notation: "compact", maximumFractionDigits: 1 }).format(n);
 export const json = (v: unknown) => JSON.stringify(v, null, 2);
 export const icon = (modelId = "") =>
   `/icons/${models.value.find((m) => m.id === modelId)?.icon ?? "lab.png"}`;
 export const shortPath = (s = "", n = 34) => (s.length > n ? "…" + s.slice(-(n - 1)) : s);
 export function ago(ms?: number) {
-  if (!ms) return "never";
+  if (!ms) return t("ago.never");
   const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.round(s / 60)}m ago`;
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
+  if (s < 60) return t("ago.seconds", { n: s });
+  if (s < 3600) return t("ago.minutes", { n: Math.round(s / 60) });
+  if (s < 86400) return t("ago.hours", { n: Math.round(s / 3600) });
+  return t("ago.days", { n: Math.round(s / 86400) });
 }
 
 // ------------------------------------------------------------------ shared agent commands
@@ -312,7 +313,7 @@ export async function interrupt() {
   if (!busy.value || interrupting.value || !agentHandle.value) return;
   interrupting.value = true;
   const done = await attempt(() => agentHandle.value!.abort(false));
-  if (done) notify("Foreground work interrupted. Background jobs continue.");
+  if (done) notify(t("store.interrupted"));
   interrupting.value = false;
 }
 
