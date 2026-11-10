@@ -1,7 +1,4 @@
-This product is derived from Durable Pi (https://github.com/indydevdan/durable-pi),
-Copyright IndyDevDan, licensed under the MIT License (see LICENSE).
-
-It embeds and depends on the following packages by earendil-works, also MIT licensed:
+This product embeds and depends on the following packages by earendil-works, all MIT licensed:
 
   @earendil-works/pi-durable   https://github.com/earendil-works/pi
   @earendil-works/pi-ai        https://github.com/earendil-works/pi
@@ -9,6 +6,3 @@ It embeds and depends on the following packages by earendil-works, also MIT lice
   @earendil-works/pi-codemode  https://github.com/earendil-works/pi
   @earendil-works/chord        https://github.com/earendil-works/pi
   @earendil-works/pi-tui       https://github.com/earendil-works/pi
-
-Upstream code was taken from durable-pi at commit 37165c6 (pi-durable 1.0.3) and
-migrated to pi-durable 1.5.0. Changes since that commit are this repository's own.

@@ -1,5 +1,5 @@
 [Unit]
-Description=Durable Pi device server (backend)
+Description=DPI device server (backend)
 After=network-online.target
 Wants=network-online.target
 

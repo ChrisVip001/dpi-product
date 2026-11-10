@@ -88,7 +88,6 @@ export function rsync(device: NetDevice, sources: string[], dest: string, cwd: s
       "--delete",
       "--exclude", "node_modules",
       "--exclude", ".data",
-      "--exclude", ".durable-pi",
       "--exclude", "dist",
       "--exclude", "*.log",
       "--exclude", ".DS_Store",
