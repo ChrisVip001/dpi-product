@@ -59,7 +59,9 @@ export function messageText(message: WireMessage): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
-    .map((block: { type?: string; text?: string }) => (block.type === "text" ? (block.text ?? "") : ""))
+    .map((block: { type?: string; text?: string }) =>
+      block.type === "text" ? (block.text ?? "") : block.type === "image" ? "[image]" : "",
+    )
     .join("");
 }
 
@@ -111,7 +113,7 @@ export function toTranscript(
       callId: id,
       name,
       args,
-      status: running?.status === "running" ? "running" : "pending",
+      status: running?.status === "running" || running?.status === "done" ? running.status : "pending",
       output: running?.output || undefined,
     };
   };

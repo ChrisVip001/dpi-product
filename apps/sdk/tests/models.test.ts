@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AgentModel, SessionModel, networkTree, lineage } from "../src/models.js";
-import { toMarkdown, toTranscript, sumUsage } from "../src/transcript.js";
+import { messageText, toMarkdown, toTranscript, sumUsage } from "../src/transcript.js";
 import type {
   AgentSummary,
   NetworkDevice,
@@ -127,9 +127,23 @@ test("a streamed turn: snapshot, deltas, tool output, results and dedupe", () =>
 test("a fresh snapshot replaces state; inbox and docs frames apply", () => {
   const model = new AgentModel();
   model.apply({ type: "snapshot", snapshot: snapshot([user(1, "a"), user(2, "b")]), inbox: [] });
-  model.apply({ type: "snapshot", snapshot: snapshot([user(9, "fresh")], { run: { inputs: [9] } }), inbox: [] });
+  model.apply({
+    type: "snapshot",
+    snapshot: snapshot([user(9, "fresh")], {
+      run: { inputs: [9] },
+      failure: { taskId: 3, inputs: [9], reason: "turn_limit", detail: "8" },
+    }),
+    inbox: [],
+  });
   assert.deepEqual(model.state.items.map((i) => i.kind === "user" && i.text), ["fresh"]);
   assert.equal(model.state.running, true);
+  assert.deepEqual(model.state.notices, ["turn_limit: 8"]);
+  model.apply({ type: "view", view: { generation: { attempt: 1, message: assistant([{ type: "text", text: "partial" }]) } } });
+  assert.equal(model.state.generating, true);
+  model.apply({ type: "view", view: { generation: { attempt: 2 } } });
+  assert.equal(model.state.generating, false);
+  model.apply({ type: "view", view: { failure: null } });
+  assert.deepEqual(model.state.notices, []);
   model.apply({ type: "inbox", items: [{ id: 7, mode: "steer", content: "use pnpm" }] });
   model.apply({ type: "doc", kind: "demo.jobs", value: { items: {} } });
   assert.equal(model.state.inbox[0].content, "use pnpm");
@@ -160,6 +174,25 @@ test("reset entry drops the old context; aborted partials and unmatched results 
   assert.equal(items[0].kind === "assistant" && items[0].error, "Interrupted. Partial response preserved.");
   assert.equal(items[2].kind === "event" && items[2].text, "Job done");
   assert.equal(sumUsage({ models: { a: usage, b: usage } }).tokens, 30);
+
+  const finished = toTranscript(
+    [
+      {
+        id: 1,
+        conversationId: 1,
+        kind: "pi.assistant",
+        model: [assistant([{ type: "toolCall", id: "c9", name: "bash", arguments: {} }])],
+      },
+    ],
+    undefined,
+    new Map([["c9", { name: "bash", status: "done", output: "" }]]),
+  );
+  const finishedCall = finished[0].kind === "assistant" && finished[0].blocks[0].type === "tool" ? finished[0].blocks[0].call : undefined;
+  assert.equal(finishedCall?.status, "done");
+  assert.equal(
+    messageText({ role: "toolResult", toolCallId: "c9", toolName: "read", content: [{ type: "image" }], isError: false } as never),
+    "[image]",
+  );
 });
 
 test("session lineage and network tree nest forks and subagents", () => {
@@ -170,6 +203,7 @@ test("session lineage and network tree nest forks and subagents", () => {
     { id: 7, name: "Root #7", named: false, kind: "root", busy: false, background: 1 },
   ];
   assert.deepEqual(lineage(agents, 4).map((a) => a.id), [1, 4]);
+  assert.deepEqual(lineage(agents, 6).map((a) => a.id), [1, 4, 6]);
   const session = new SessionModel();
   session.apply({ type: "session", agents, tasks: [{ id: 1, kind: "pi.generation", conversationId: 1, background: false, state: { status: "running" }, conversations: [] }], usage: { models: {}, tools: {} } });
   assert.equal(session.foregroundBusy(1), true);

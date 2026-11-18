@@ -189,7 +189,9 @@ export function hooksRouter(store: Store, hooks: Hooks) {
       const waitMs = waitOf(body.waitMs);
       if (waitMs > 0) {
         const result = await store.settled(h, submission.id, waitMs, abortOnClose(res));
-        store.remember(key, routeId, 200, result);
+        // A wait that is still running must not be cached. The next delivery of this event would replay "pending"
+        // and never collect the answer. The harness already dedupes requestId, so the retry waits on the same run.
+        if (result.status === "done" || result.status === "unanswered") store.remember(key, routeId, 200, result);
         return void res.status(200).json(result);
       }
       const payload = {

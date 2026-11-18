@@ -76,7 +76,10 @@ export function bridgeApp(config: BridgeConfig, options: { log?: (line: string) 
     for (const [key, at] of seen) if (now - at > KEEP_MS) seen.delete(key);
 
     const hook = learn(inbound.chatId);
-    if (!hook) return log(`no route for chat ${inbound.chatId}`);
+    if (!hook) {
+      seen.delete(inbound.eventId);
+      return log(`no route for chat ${inbound.chatId}`);
+    }
 
     const started = Date.now();
     /** Set once the device owns the work: from then on this chat is owed an answer. */
@@ -101,6 +104,8 @@ export function bridgeApp(config: BridgeConfig, options: { log?: (line: string) 
       else log(`could not answer ${inbound.chatId}; it stays owed and is retried on the next start`);
       log(`answered ${inbound.chatId} via ${hook} in ${Math.round((Date.now() - started) / 1000)}s`);
     } catch (e) {
+      // The device never accepted the work, so a platform retry must be allowed to try again.
+      if (!owed) seen.delete(inbound.eventId);
       log(`delivery to ${hook} failed: ${message(e)}`);
       // A 4xx fails the same way forever; anything else may still finish, so the debt is kept.
       if (owed && e instanceof DeviceError && e.permanent) pending.drop(owed);

@@ -4,11 +4,11 @@ The contract every DPI client uses: the web hub, `tui`, scripts, other agents. T
 
 ## Conventions
 
-- **Auth.** Every `/v1/*` route requires `Authorization: Bearer <DPI_TOKEN>`. `X-DPI-Token: <DPI_TOKEN>` also works, for proxies that strip `Authorization`. Only `GET /healthz` is open.
+- **Auth.** Every `/v1/*` route requires `Authorization: Bearer <DPI_TOKEN>`. `X-DPI-Token: <DPI_TOKEN>` also works, for proxies that strip `Authorization`. Only `GET /healthz` is open. `/v1/hooks/*` is the exception: it signs with the hook secret (`x-dpi-hook-timestamp`, `x-dpi-hook-signature: sha256=<hex>`, and `x-dpi-event` on a delivery) and does not take the device token.
 - **Vocabulary.** A **session** is one harness and one agent database on the device. An **agent** is a pi-durable conversation in that session: the root (`Main`), a fork, or a subagent. The agent id is the conversation id.
 - **Addressing.** `:s` is a session UUID or its unique name (case-insensitive). `:a` is a numeric agent id, `main`, or a unique agent name. Ambiguous names return `409 ambiguous`.
 - **Idempotency.** `POST .../messages` takes a required `requestId`, and pi-durable admits each one exactly once. `POST /sessions`, `POST .../agents` and `POST .../fork` accept an `Idempotency-Key` header of up to 128 characters. A repeat gets the stored response with `Idempotent-Replay: true`. Keys are kept for at least 24h, and reusing a key on another route returns `400 invalid`.
-- **Errors.** Every error has the shape `{ "error": { "code", "message" } }`. Codes: `unauthorized` 401, `not_found` 404, `invalid` 400, `busy` 409 (reject-if-busy), `conflict` 409 (stale App State revision), `ambiguous` 409, `unavailable` 503 (session failed to open), `internal` 500. Clients can also see `offline`: the SDK raises it when a device cannot be reached, and the hub's proxy returns it with 502.
+- **Errors.** Every error has the shape `{ "error": { "code", "message" } }`. Codes: `unauthorized` 401, `not_found` 404, `invalid` 400, `busy` 409 (reject-if-busy), `idle` 409, `read_only` 409, `conflict` 409 (stale App State revision), `ambiguous` 409, `session_failed` 503, `unavailable` 503 (session failed to open), `internal` 500. Clients can also see `offline`: the SDK raises it when a device cannot be reached, and the hub's proxy returns it with 502.
 - **Versioning.** `/v1` and `apiVersion: 1` in `GET /v1/device` and in every `hello` frame. Changes inside v1 are additive.
 
 ## Routes
@@ -17,6 +17,11 @@ The contract every DPI client uses: the web hub, `tui`, scripts, other agents. T
 |---|---|---|
 | `GET /healthz` | (no auth) | `{ok:true}` |
 | `GET /v1/device` | | `DeviceInfo`: uid, name, hostname, platform, `apiVersion`, `durableVersion`, `startedAt`, models, `defaultModel`, `startDirs`, storage, `codeDir` (the checkout it runs from), capabilities, `jobs` (durable job definitions) |
+| `GET /v1/runtime` | | counters, task states, durations and recent failures for the runtime panel |
+| `POST /v1/hooks/:name` | signed `{text, chat?, user?, source?, waitMs?}` plus `x-dpi-event` | `202 {submissionId, status:"queued"}`, or `200` SendResult when `waitMs` reaches a terminal status. A non-terminal wait is not cached |
+| `GET /v1/hooks/:name/submissions/:id` | signed `?waitMs=` | the same SendResult |
+| `GET /v1/hooks/:name/approvals` | signed | job runs waiting for a person |
+| `POST /v1/hooks/:name/approvals/:taskId` | signed `{approved}` | `{ok}` |
 | `GET /v1/tree` | | `DeviceTree`: sessions with agents and busy/background |
 | `GET /v1/events` | `?docs=app.shared-state` | device stream |
 | `GET /v1/fs/dirs` | `?path=` (empty = start dirs) | `{path, parent, dirs[]}`, one level, directories only |
@@ -50,7 +55,7 @@ The contract every DPI client uses: the web hub, `tui`, scripts, other agents. T
 
 ## Agent tools
 
-Every agent gets the coding tools `read`, `write`, `edit` and `bash`, plus the built-in tools `read_state`, `update_state`, `list_durable_jobs`, `run_durable_job`, `check_durable_job`, `search_history`, `ping_on_call_engineer`, `subagent`, `start_session` and `handoff`. `readOnly` removes the eight that write: `bash`, `write`, `edit`, `update_state`, `run_durable_job`, `ping_on_call_engineer`, `subagent` and `start_session`. `GET .../agents/:a` lists each tool with its replay policy and whether it is offered.
+Every agent gets the coding tools `read`, `write`, `edit` and `bash`, plus `read_state`, `update_state`, `list_durable_jobs`, `run_durable_job`, `check_durable_job`, `search_history`, `gather`, `ping_on_call_engineer`, `subagent`, `start_session` and `handoff`. `DPI_CODEMODE=on` also offers `codemode`. `readOnly` removes every tool classed as a write, and any tool nobody classed: `bash`, `write`, `edit`, `update_state`, `run_durable_job`, `ping_on_call_engineer`, `subagent`, `start_session` and `handoff`. `GET .../agents/:a` lists each tool with its replay policy and whether it is offered.
 
 ## Durable jobs
 

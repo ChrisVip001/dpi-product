@@ -120,7 +120,13 @@ export function lockFile(path: string) {
     take();
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-    const pid = Number(readFileSync(path, "utf8"));
+    const pid = Number(readFileSync(path, "utf8").trim());
+    // An empty or corrupt lock is not a live process. kill(0) signals the whole process group and looks alive.
+    if (!Number.isInteger(pid) || pid <= 0) {
+      unlinkSync(path);
+      take();
+      return () => release(path);
+    }
     let alive = false;
     try {
       process.kill(pid, 0);
@@ -132,11 +138,13 @@ export function lockFile(path: string) {
     unlinkSync(path);
     take();
   }
-  return () => {
-    try {
-      if (readFileSync(path, "utf8") === String(process.pid)) unlinkSync(path);
-    } catch {}
-  };
+  return () => release(path);
+}
+
+function release(path: string) {
+  try {
+    if (readFileSync(path, "utf8") === String(process.pid)) unlinkSync(path);
+  } catch {}
 }
 
 type Opened = { harness: Harness; unlock: () => void; unsubscribe: () => void; jobs: Jobs; addons: Addons };
@@ -521,11 +529,9 @@ export class Store {
         if (c) await c.abort(ctx, { background: true }).catch(() => {});
       }
       opened.unsubscribe();
-      try {
-        await opened.harness.close(ctx);
-      } finally {
-        opened.unlock();
-      }
+      // Keep the lock if close fails. Releasing it lets another process open the same file this process still holds.
+      await opened.harness.close(ctx);
+      opened.unlock();
       this.opened.delete(row.id);
     }
     await mkdir(this.archiveDir, { recursive: true });
@@ -918,6 +924,7 @@ export class Store {
         record = await submission.wait(withAbortSignal(stop, ctx));
       } catch (e) {
         if (!stop.aborted) throw e;
+        record = await submission.status(ctx);
       }
     }
     if (record.status === "done" && record.answer !== undefined) {

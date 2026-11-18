@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { mkdir } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
-import type { Store } from "../src/store.js";
+import { lockFile, type Store } from "../src/store.js";
 import { JOB_RUNS_DOC, type JobRunsDoc } from "../../sdk/src/jobs.js";
 import { faux, tempStore, until } from "./helpers.js";
 
@@ -255,5 +256,19 @@ test("read only: the agent is offered only tools that read; turning it off resto
   } finally {
     await store.close();
     await t.cleanup();
+  }
+});
+
+test("a blank or corrupt database lock is taken over", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dpi-lock-"));
+  try {
+    for (const contents of ["", "nope", "0"]) {
+      const path = join(dir, `db-${contents || "empty"}.lock`);
+      writeFileSync(path, contents);
+      lockFile(path)();
+      assert.equal(existsSync(path), false);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

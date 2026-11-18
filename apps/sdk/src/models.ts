@@ -15,6 +15,7 @@ import type {
   WireEntry,
   WireSnapshotEvent,
   WireViewUpdate,
+  WireRunFailure,
   WireUsageState,
 } from "./api.js";
 import { toTranscript, type LiveTool, type TranscriptItem } from "./transcript.js";
@@ -78,13 +79,16 @@ export class AgentModel extends Emitter {
 
   /** Apply one stream frame; returns true when state changed. */
   apply(frame: Frame): boolean {
+    let transcript = false;
     switch (frame.type) {
       case "snapshot":
         this.reset(frame.snapshot);
         this.state.inbox = frame.inbox;
+        transcript = true;
         break;
       case "view":
         this.view(frame.view);
+        transcript = true;
         break;
       case "inbox":
         this.state.inbox = frame.items;
@@ -95,7 +99,8 @@ export class AgentModel extends Emitter {
       default:
         return false;
     }
-    this.rebuild();
+    // Inbox and job documents do not change the conversation text. Rebuilding it on every step re-sorted the window.
+    if (transcript) this.rebuild();
     this.emit();
     return true;
   }
@@ -132,14 +137,11 @@ export class AgentModel extends Emitter {
     }
     if (update.entries) for (const entry of update.entries) this.commit(entry);
     if (update.generation !== undefined) {
-      this.live =
-        update.generation === null
-          ? undefined
-          : update.generation.message
-            ? structuredClone(update.generation.message)
-            : this.live;
+      // The device sends the whole generation. No message means this attempt has no partial yet.
+      this.live = update.generation?.message ? structuredClone(update.generation.message) : undefined;
       this.state.retry = update.generation?.retry;
     }
+    if (update.failure !== undefined) this.state.notices = update.failure ? [failureNotice(update.failure)] : [];
     if (update.tools)
       this.tools = new Map(
         update.tools.map((slot) => [slot.callId, { name: slot.name, status: slot.status, output: slot.output ?? "" }]),
@@ -165,6 +167,7 @@ export class AgentModel extends Emitter {
     this.state.usage = snapshot.usage;
     this.state.retry = snapshot.generation?.retry;
     this.state.compactions = snapshot.compactions.map((c) => c.taskId);
+    this.state.notices = snapshot.failure ? [failureNotice(snapshot.failure)] : [];
     this.state.ready = true;
   }
 
@@ -223,7 +226,7 @@ export class SessionModel extends Emitter {
     return this.state.agents.find((a) => a.id === id);
   }
 
-  /** Root → … → id, following fork parents. */
+  /** Root → … → id, following fork parents and then the agent that owns a subagent. */
   lineage(id: number): AgentSummary[] {
     return lineage(this.state.agents, id);
   }
@@ -247,9 +250,13 @@ export function lineage(agents: readonly AgentSummary[], id: number): AgentSumma
     const agent = byId.get(current);
     if (!agent) break;
     out.unshift(agent);
-    current = agent.parentId;
+    current = agent.parentId ?? agent.ownerAgentId;
   }
   return out;
+}
+
+function failureNotice(failure: WireRunFailure) {
+  return failure.detail ? `${failure.reason}: ${failure.detail}` : failure.reason;
 }
 
 // ---------------------------------------------------------------- network tree

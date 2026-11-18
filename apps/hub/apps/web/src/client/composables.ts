@@ -2,7 +2,7 @@
 // counter bumps on every change so computed views re-evaluate once per frame.
 import { computed, ref, shallowRef, watch, type Ref } from "vue";
 import { AgentModel, NetworkModel, SessionModel } from "@sdk/models";
-import type { Activity, Frame } from "@sdk/api";
+import type { Frame } from "@sdk/api";
 import type { AppState } from "@sdk/app-state";
 import type { HubStream } from "./stream";
 
@@ -57,12 +57,9 @@ export function useNetwork(stream: HubStream) {
 
 export function useDevice(stream: HubStream, deviceId: Ref<string | undefined>) {
   const sharedState = shallowRef<{ value: AppState; revision: number }>();
-  const activity = shallowRef<Activity[]>([]);
   const { status, select } = feed(stream, "device", (frame) => {
     if (frame.type === "doc" && frame.kind === "app.shared-state")
       sharedState.value = { value: frame.value as AppState, revision: frame.revision ?? 0 };
-    else if (frame.type === "activity")
-      activity.value = [...activity.value, ...frame.items].slice(-50);
   });
   watch(
     deviceId,
@@ -72,7 +69,7 @@ export function useDevice(stream: HubStream, deviceId: Ref<string | undefined>) 
     },
     { immediate: true },
   );
-  return { sharedState, activity, status };
+  return { sharedState, status };
 }
 
 export function useSession(stream: HubStream, target: Ref<SessionTarget | undefined>) {

@@ -31,6 +31,7 @@ import {
   currentModel,
   detail,
   device,
+  deviceId,
   deviceFeed,
   hideInspector,
   icon,
@@ -69,7 +70,7 @@ const usageRows = computed(() => [
   { label: t("inspector.usage.cacheRead"), tokens: usage.value.cacheRead, cost: usage.value.cacheReadCost },
   { label: t("inspector.usage.cacheWrite"), tokens: usage.value.cacheWrite, cost: usage.value.cacheWriteCost },
 ]);
-const background = computed(() => tasks.value.filter((task) => task.background).length);
+const background = computed(() => tasks.value.filter((task) => task.effectiveBackground).length);
 
 function configure(
   patch: Parameters<NonNullable<typeof agentHandle.value>["configure"]>[0],
@@ -114,6 +115,10 @@ function resetStateDraft() {
   stateError.value = "";
 }
 watch(shared, () => !stateDirty.value && resetStateDraft(), { immediate: true });
+// A dirty draft is for the device that produced it. The next device often has the same revision number.
+watch(deviceId, (id, prev) => {
+  if (prev !== undefined && id !== prev) resetStateDraft();
+});
 
 async function editState(change: StateChange) {
   if (stateSaving.value || !agentHandle.value) return;

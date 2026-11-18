@@ -220,15 +220,23 @@ export const currentModel = computed(() => {
 /** Tools and extensions come from GET agent (not streamed); refresh on selection and config changes. */
 export const detail = shallowRef<AgentDetail>();
 let detailSeq = 0;
+let detailHandle: typeof agentHandle.value;
 export async function refreshDetail() {
   const handle = agentHandle.value;
   const seq = ++detailSeq;
+  if (handle !== detailHandle) {
+    detailHandle = handle;
+    detail.value = undefined;
+  }
   if (!handle || !online.value) return void (detail.value = undefined);
   try {
     const d = await handle.get();
     if (seq === detailSeq) detail.value = d;
-  } catch {
-    if (seq === detailSeq) detail.value = undefined;
+  } catch (e) {
+    if (seq === detailSeq) {
+      detail.value = undefined;
+      ui.error = message(e);
+    }
   }
 }
 watch([agentHandle, online], () => void refreshDetail(), { immediate: true });

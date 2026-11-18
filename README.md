@@ -2,7 +2,7 @@
 
 Durable agents that run on your machines, survive restarts, and are driven from a browser, a terminal or one `curl`.
 
-The agent runtime is `pi-durable` **1.5.0**, pinned exactly; `NOTICE` lists the third-party packages this product embeds.
+The agent runtime is `pi-durable` **1.5.2**, pinned exactly; `NOTICE` lists the third-party packages this product embeds.
 
 ## What it is
 
@@ -80,7 +80,7 @@ requirement without ever holding the device token. Declare hooks in `~/.dpi/hook
 
 ```bash
 # The bridge signs this; a script can do the same. Timestamp is seconds, signature is sha256=<hex>.
-# base = sha256("<ts>\n<METHOD>\n<url>\nsha256(<body>)"), signature = HMAC-SHA256(secret, base)
+# signature = HMAC-SHA256(secret, "<ts>\n<METHOD>\n<path>\nsha256hex(<body>)")
 curl -X POST http://127.0.0.1:4780/v1/hooks/feishu-work \
   -H "x-dpi-event: <unique id, the idempotency key>" \
   -H "x-dpi-hook-timestamp: <seconds>" -H "x-dpi-hook-signature: sha256=<hex>" \

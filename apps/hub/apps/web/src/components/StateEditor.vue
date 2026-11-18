@@ -94,9 +94,9 @@ function add() {
         :disabled="disabled"
         @change="emit('change', $event)"
       />
-      <form v-if="adding && kind === 'array'" class="state-add" @submit.prevent="add">
+      <form v-if="adding" class="state-add" @submit.prevent="add">
         <input
-          v-if="kind !== 'array'"
+          v-if="kind === 'object'"
           v-model="key"
           :placeholder="t('state.fieldName')"
           :aria-label="t('state.newFieldName', { path: path || '/' })"
@@ -110,7 +110,7 @@ function add() {
         >
           <option v-for="type in types" :key="type" :value="type">{{ type }}</option>
         </select>
-        <button class="secondary small" :disabled="disabled || (kind !== 'array' && !key.trim())">
+        <button class="secondary small" :disabled="disabled || (kind === 'object' && !key.trim())">
           {{ t("state.add") }}
         </button>
         <button type="button" class="text-button" @click="adding = false">
@@ -118,13 +118,13 @@ function add() {
         </button>
       </form>
       <button
-        v-else-if="kind === 'array'"
+        v-else
         class="text-button state-add-button"
         :disabled="disabled"
-        :aria-label="t('state.addItem')"
+        :aria-label="kind === 'array' ? t('state.addItem') : t('state.addField')"
         @click="adding = true"
       >
-        <Plus :size="18" />{{ t("state.addItem") }}
+        <Plus :size="18" />{{ kind === "array" ? t("state.addItem") : t("state.addField") }}
       </button>
     </template>
     <div v-else-if="kind === 'number'" class="state-number">

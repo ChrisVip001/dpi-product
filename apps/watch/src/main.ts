@@ -98,6 +98,7 @@ const watcher = new Watcher((notice) => {
 
 const client = new DpiClient(url, token);
 const clients = new Map<string, AbortController>();
+const liveSessions = new Set<string>();
 const stop = new AbortController();
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -111,10 +112,11 @@ process.on("SIGTERM", () => shutdown(0));
 
 /** One session stream per session the tree reports; task states feed the "needs you" notices. */
 function follow(sessionId: string, name: string) {
-  if (clients.has(sessionId)) return;
+  if (clients.has(sessionId) || !liveSessions.has(sessionId)) return;
   const controller = new AbortController();
   clients.set(sessionId, controller);
-  stop.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  const onStop = () => controller.abort();
+  stop.signal.addEventListener("abort", onStop, { once: true });
   void (async () => {
     try {
       for await (const frame of client.session(sessionId).events(controller.signal)) {
@@ -122,10 +124,12 @@ function follow(sessionId: string, name: string) {
         else if (frame.type === "tasks") watcher.tasks(sessionId, frame.tasks);
       }
     } catch {
-      // A closed session stream is not an incident: the tree drops it and the device stream stays up.
+      // The device stream is what reports the device as down. This stream just tries again.
     } finally {
       clients.delete(sessionId);
-      void name;
+      stop.signal.removeEventListener("abort", onStop);
+      if (stop.signal.aborted || !liveSessions.has(sessionId)) return;
+      setTimeout(() => follow(sessionId, name), 3000).unref?.();
     }
   })();
 }
@@ -141,6 +145,9 @@ async function deviceLoop() {
           watcher.activity(frame.items);
         } else if (frame.type === "tree") {
           watcher.tree(frame.tree);
+          liveSessions.clear();
+          for (const session of frame.tree.sessions) liveSessions.add(session.id);
+          for (const [id, controller] of clients) if (!liveSessions.has(id)) controller.abort();
           for (const session of frame.tree.sessions) follow(session.id, session.name);
         } else if (frame.type === "fault") {
           process.stderr.write(`${t("watch.fault", { message: frame.error.message })}\n`);

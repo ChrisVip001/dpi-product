@@ -8,12 +8,35 @@ import { agentHandle, agentState, attempt, online, refreshDetail } from "../clie
 import { t } from "../i18n";
 
 const data = shallowRef<AgentExtensions>();
+const error = ref("");
 const busy = ref(false);
+let loadSeq = 0;
+let loaded: typeof agentHandle.value;
 
 async function load() {
   const handle = agentHandle.value;
-  if (!handle || !online.value) return void (data.value = undefined);
-  data.value = (await handle.extensions().catch(() => undefined)) ?? data.value;
+  const seq = ++loadSeq;
+  if (!handle || !online.value) {
+    loaded = undefined;
+    data.value = undefined;
+    error.value = "";
+    return;
+  }
+  if (handle !== loaded) {
+    loaded = handle;
+    data.value = undefined;
+    error.value = "";
+  }
+  try {
+    const next = await handle.extensions();
+    if (seq !== loadSeq) return;
+    data.value = next;
+    error.value = "";
+  } catch (e) {
+    if (seq !== loadSeq) return;
+    data.value = undefined;
+    error.value = e instanceof Error ? e.message : String(e);
+  }
 }
 // Reload on a new selection, and when the agent's stored extension selection changes from any client.
 watch([agentHandle, online, () => JSON.stringify(agentState.value.agent.extensions ?? null)], load, { immediate: true });
@@ -39,7 +62,8 @@ async function set(patch: { name: string; enabled: boolean } | { prompt: string;
       <Puzzle :size="18" />
     </div>
     <p class="hint">{{ t("extensions.hint") }}</p>
-    <p v-if="!data" class="task-empty">{{ t("extensions.loading") }}</p>
+    <p v-if="error" class="message-error">{{ error }}</p>
+    <p v-else-if="!data" class="task-empty">{{ t("extensions.loading") }}</p>
     <article
       v-for="ext in data?.extensions ?? []"
       :key="ext.name"

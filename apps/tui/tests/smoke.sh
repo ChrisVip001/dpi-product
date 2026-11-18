@@ -3,6 +3,7 @@
 #   tests/smoke.sh faux       boot a faux-provider backend (deterministic, no model costs)
 #   tests/smoke.sh <device>   a device from ~/.dpi/network.sqlite with its real model (e.g. mac-mini)
 set -euo pipefail
+export DPI_LANG=en
 cd "$(dirname "$0")/.."
 TARGET=${1:-faux}
 S="dpi-smoke-$$"

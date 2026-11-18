@@ -25,9 +25,9 @@ export class DeviceError extends Error {
     super(message);
   }
 
-  /** 4xx means the same request will never work: a missing submission, a rotated secret, a bad hook. */
+  /** 4xx means the same request will never work: a missing submission, a rotated secret, a bad hook. 429 is a rate limit. */
   get permanent() {
-    return this.status >= 400 && this.status < 500;
+    return this.status >= 400 && this.status < 500 && this.status !== 429;
   }
 }
 
@@ -49,13 +49,21 @@ export class Device {
     return secret;
   }
 
-  private call(method: "GET" | "POST", hook: string, path: string, payload?: unknown, waitMs = 0) {
+  private call(
+    method: "GET" | "POST",
+    hook: string,
+    path: string,
+    payload?: unknown,
+    waitMs = 0,
+    extra: Record<string, string> = {},
+  ) {
     const body = payload === undefined ? "" : JSON.stringify(payload);
     const timestamp = String(Math.floor(Date.now() / 1000));
     return fetch(this.baseUrl + path, {
       method,
       headers: {
         "content-type": "application/json",
+        ...extra,
         "x-dpi-hook-timestamp": timestamp,
         "x-dpi-hook-signature": `sha256=${sign(this.secret(hook), timestamp, method, path, body)}`,
       },
@@ -67,7 +75,7 @@ export class Device {
   /** Hand one requirement to the hook's agent. Returns at once; `read` waits for the answer. */
   async deliver(hook: string, payload: { text: string; chat: string; user?: string; source: string; event: string }) {
     const path = `/v1/hooks/${encodeURIComponent(hook)}`;
-    const response = await this.call("POST", hook, path, payload);
+    const response = await this.call("POST", hook, path, payload, 0, { "x-dpi-event": payload.event });
     const body = (await response.json().catch(() => undefined)) as
       | { submissionId?: number; status?: string; error?: { message?: string } }
       | undefined;

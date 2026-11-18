@@ -6,6 +6,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DeviceError } from "../src/device.js";
 import { bridgeApp } from "../src/routes.js";
 import type { BridgeConfig } from "../src/config.js";
 
@@ -31,6 +32,7 @@ const signature = (method: string, url: string, body: string, timestamp: string)
 
 type Recorded = {
   replies: { messageId: string; text: string }[];
+  events: string[];
   deliveries: Record<string, unknown>[];
   cards: Record<string, any>[];
   patched: Record<string, any>[];
@@ -42,7 +44,7 @@ type Recorded = {
 async function harness(
   options: { approvers?: string[]; readsUntilDone?: number; stateFile?: string; readError?: number } = {},
 ) {
-  const seen: Recorded = { replies: [], deliveries: [], cards: [], patched: [], decisions: [], reads: [] };
+  const seen: Recorded = { replies: [], events: [], deliveries: [], cards: [], patched: [], decisions: [], reads: [] };
   const stateFile = options.stateFile ?? join(mkdtempSync(join(tmpdir(), "bridge-")), "state.json");
   let reads = 0;
 
@@ -93,6 +95,7 @@ async function harness(
         return res.end(JSON.stringify({ ok: true }));
       }
       if (req.method === "POST") {
+        seen.events.push(String(req.headers["x-dpi-event"] ?? ""));
         seen.deliveries.push(JSON.parse(body));
         res.statusCode = 202;
         return res.end(JSON.stringify({ submissionId: 7, status: "queued" }));
@@ -189,6 +192,7 @@ test("a Feishu mention becomes a signed hook call and the answer comes back on t
     const first = await post(h.base, messageEvent("oc_1", "evt-1"));
     assert.equal(first.status, 200); // answered before the agent ran
     await until(() => h.seen.replies.length === 1);
+    assert.equal(h.seen.events[0], "feishu:evt-1");
     assert.deepEqual(h.seen.deliveries[0], {
       text: "修一下登录",
       chat: "oc_1",
@@ -330,4 +334,9 @@ test("the debt is on disk while the agent works and gone once the chat is answer
   } finally {
     h.close();
   }
+});
+
+test("a rate limit can be retried; a rejected request cannot", () => {
+  assert.equal(new DeviceError(429, "limited").permanent, false);
+  assert.equal(new DeviceError(400, "bad").permanent, true);
 });
